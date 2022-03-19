@@ -1,0 +1,12 @@
+Total params: 25,557,032
+Trainable params: 25,557,032
+Non-trainable params: 0
+----------------------------------------------------------------
+Input size (MB): 0.57
+Forward/backward pass size (MB): 286.56
+Params size (MB): 97.49
+Estimated Total Size (MB): 384.62
+----------------------------------------------------------------
+Total MemCaps(MB) : 48.75
+Total Xbars:  12577
+Total RRAM PEs : 1572
