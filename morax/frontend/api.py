@@ -15,7 +15,7 @@ import subprocess as SP
 from torch._C import CONV_BN_FUSION
 import morax.model.layer as Lyr
 import morax.model.model as Model
-from morax.frontend.configparser import apd_is_index2
+from morax.frontend.csvparser import apd_is_index2
 from morax.model.layer import MXLCD, MXLTD, MXNTD
 
 
@@ -96,6 +96,11 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
         if layertype == 'GEMM':
             layername = layertype + str(idx)
             linearlayer = Lyr.GEMM(layername, idx, Lyr.LinearLayerType.GEMM, line)
+            model_list.add_layer(copy.deepcopy(linearlayer))
+            model_dag.add_layer(idx, True)
+        if layertype == 'Layernorm':
+            layername = layertype + str(idx)
+            linearlayer = Lyr.Layernorm(layername, idx, Lyr.LinearLayerType.Layernorm, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
         if layertype == 'Pooling':

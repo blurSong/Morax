@@ -27,7 +27,8 @@ morax_linearlayer_type_dicts = {
     7: 'VDP',
     8: 'VADD',
     9: 'VMUL',
-    10: 'GEMM'
+    10: 'GEMM',
+    11: 'Layernorm'
 }  #MXLTD
 
 morax_nonlinearlayer_type_dicts = {
@@ -64,6 +65,7 @@ class LinearLayerType(Enum):
     VADD = 8
     VMUL = 9
     GEMM = 10
+    Layernorm = 11
 
 
 class NonlinearLayerType(Enum):
@@ -79,7 +81,7 @@ class Layer():
 
 
 class LinearLayer(Layer):
-    def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
+    def __init__(self, _layername, _layerindex, _layertype: LinearLayerType, _layercsvline) -> None:
         Layer.__init__(self, _layername, _layerindex)
         self.layer_type = _layertype
         self.layer_csvline = _layercsvline
@@ -195,8 +197,17 @@ class GEMM(LinearLayer):
         self.input_indecies_tuple = (self.layer_csvline[MXLCD['IDX']], self.layer_csvline[MXLCD['APD']])
 
 
-class NonlinearLayer(Layer):
+class Layernorm(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
+        LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
+        self.channel = self.layer_csvline[MXLCD['IC']]
+        self.feature_size = self.layer_csvline[MXLCD['FS']]
+        self.is_activated = False if self.layer_csvline[MXLCD['RP']] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[MXLCD['IDX']], 0)
+
+
+class NonlinearLayer(Layer):
+    def __init__(self, _layername, _layerindex, _layertype: NonlinearLayerType, _layercsvline) -> None:
         Layer.__init__(self, _layername, _layerindex)
         self.layer_type = _layertype
         self.layer_csvline = _layercsvline

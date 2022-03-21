@@ -15,17 +15,6 @@ import copy
 from enum import Enum
 from typing import List
 
-
-class Component(Enum):
-    WB = 0
-    FB = 1
-    SMU = 2
-    VPU = 3
-    TC = 4
-    NVTC = 5
-    BUS = 6
-
-
 #  WB <-> TC
 #  FB
 #
