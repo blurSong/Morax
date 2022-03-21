@@ -122,24 +122,24 @@ class SubQueryExcuteOnSMU(SubQueryExcute):
         assert self.checkquery() is True
 
     def checkquery(self):
-        dfsafe = self.dfmod == "UpSteam" or self.dfmod == "DownSteam"
+        dfsafe = self.dfmod == "UpStream" or self.dfmod == "DownStream"
         executionsafe = self.execution in MoraxExecutionDict[ClusterComponent.SMU]
         tasksafe = self.tasksize <= HWDicts["SMUMaxIO"]
         return dfsafe and executionsafe and tasksafe
 
 
 class SubQueryClusterTransfer:
-    def __init__(self, _bulklable, _bulksize, _fromCluster, _toCluster):
+    def __init__(self, _bulklabel, _bulksize, _fromCluster, _toCluster):
         self.bulksize = _bulksize
-        self.bulklabel = _bulklable
+        self.bulklabel = _bulklabel
         self.fromCluster = _fromCluster
         self.toCluster = _toCluster
 
 
 class SubQueryClusterTransfer:
-    def __init__(self, _bulklable, _bulksize, _toCluster):
+    def __init__(self, _bulklabel, _bulksize, _toCluster):
         self.bulksize = _bulksize
-        self.bulklabel = _bulklable
+        self.bulklabel = _bulklabel
         self.toCluster = _toCluster
 
 
