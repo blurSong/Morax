@@ -15,14 +15,11 @@ import copy
 from enum import Enum
 from typing import List
 
-int64 = np.int64
-
 
 class TimeStamp:
-    def __init__(self, _execution: Enum, _issue_t: int, _label: str) -> None:
-        # self.fromComp = _from
-        # self.toComp = _to
-        self.execution = _execution
+    def __init__(self, _to, _from, _issue_t, _label: str) -> None:
+        self.fromComp = _from
+        self.toComp = _to
         self.span = 0
         self.label = _label
         self.issue_t = _issue_t
@@ -41,9 +38,9 @@ class TimeFilm(List):
     def __init__(self) -> None:
         super().__init__()
 
-    def append_stamp(self, _stamp: TimeStamp):
-        if self[-1].submit_t >= _stamp.issue_t:
-            _stamp.issue_t = self[-1].submit_t + 1
-            _stamp.submit_t = _stamp.issue_t + _stamp.span
-        thisstamp = copy.deepcopy(_stamp)
-        self.append(thisstamp)
+    def add_stamp(self, _stamp):
+        if self[-1].submittime >= _stamp.issuetime:
+            thisstamp = copy.deepcopy(_stamp)
+            thisstamp.issuetime = self[-1].submittime + 1
+            thisstamp.submittime = thisstamp.issuetime + thisstamp.span
+            self.append(thisstamp)

@@ -46,6 +46,7 @@ MoraxExecutionDict = {
         LLT.TRCONV,
         LLT.NGCONV,
         LLT.GEMM,
+        LLT.MADD,
         NLT.Pooling,
     ],
     CC.nvTensorCore: [
@@ -57,5 +58,13 @@ MoraxExecutionDict = {
         SO.LookUp,
     ],
     CC.SMU: [SO.Transpose, SO.Truncation, SO.HWNC2CHWN, SO.CHWN2HWNC],
-    CC.VPU: [LLT.Residual, LLT.VDP, LLT.VADD, LLT.VMUL, NLT.Pooling, NLT.Softmax1D],
+    CC.VPU: [
+        LLT.Linear,
+        LLT.Residual,
+        LLT.VDP,
+        LLT.VADD,
+        LLT.VMUL,
+        NLT.Pooling,
+        NLT.Softmax1D,
+    ],
 }

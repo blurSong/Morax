@@ -18,7 +18,7 @@ from hardware.cluster import HWDicts
 # indicate the data form of input and weight
 # bulkfrom = (part or whole) feature: NCHW  weight: KCRS  MVM & GEMM: TODO
 # dataname = W or F or TODO
-# bulklable = modelname_'L'+layeridx_'dataname'+bulkidx_bulksizekB_bulkfrom
+# bulklabel = modelname_'L'+layeridx_'dataname'+bulkidx_bulksizekB_bulkfrom
 
 # [task]
 # indicate the task excution scale using [output]
@@ -26,7 +26,7 @@ from hardware.cluster import HWDicts
 # CONV
 # RRAM: CHWN onefeaturebyonefeature    OS: HWNC onechannelbyonechannel (FOR MAX KERNEL REUSE)
 # TODO
-# tasklable = modelname_'L'+layeridx_'T'+taskidx_taskform
+# tasklabel = modelname_'L'+layeridx_'T'+taskidx_taskform
 
 
 class SubQueryRead:
@@ -46,9 +46,9 @@ class SubQueryWrite:
 
 
 class SubQueryExcute:
-    def __init__(self, _layertype, _tasklabel: str):
+    def __init__(self, _layerclass, _tasklabel: str):
         self.tasklabel = _tasklabel
-        self.layertype = _layertype
+        self.layerclass = copy.deepcopy(_layerclass)
         self.taskfrom = self.get_taskform(_tasklabel)
 
     def get_taskform(self, _tasklabel):
@@ -58,9 +58,14 @@ class SubQueryExcute:
 
 class SubQueryExcuteOnTC(SubQueryExcute):
     def __init__(
-        self, _layertype, _tasklabel: str, _dfmod: str, _execution, _tasksize: float
+        self,
+        _layerclass,
+        _tasklabel: str,
+        _dfmod: str,
+        _execution,
+        _tasksize: tuple(float, float),
     ):
-        super().__init__(_layertype, _tasklabel)
+        super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
         self.tasksize = _tasksize
@@ -77,9 +82,14 @@ class SubQueryExcuteOnTC(SubQueryExcute):
 
 class SubQueryExcuteOnNVTC(SubQueryExcute):
     def __init__(
-        self, _layertype, _tasklabel: str, _dfmod: str, _execution, _tasksize: float
+        self,
+        _layerclass,
+        _tasklabel: str,
+        _dfmod: str,
+        _execution,
+        _tasksize: tuple(float, float),
     ):
-        super().__init__(_layertype, _tasklabel)
+        super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
         self.tasksize = _tasksize
@@ -96,9 +106,14 @@ class SubQueryExcuteOnNVTC(SubQueryExcute):
 
 class SubQueryExcuteOnVPU(SubQueryExcute):
     def __init__(
-        self, _layertype, _tasklabel: str, _dfmod: str, _execution, _tasksize: float
+        self,
+        _layerclass,
+        _tasklabel: str,
+        _dfmod: str,
+        _execution,
+        _tasksize: tuple(float, float),
     ):
-        super().__init__(_layertype, _tasklabel)
+        super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
         self.tasksize = _tasksize
@@ -106,16 +121,21 @@ class SubQueryExcuteOnVPU(SubQueryExcute):
 
     def checkquery(self):
         dfsafe = self.dfmod == "Para" or self.dfmod == "Reduce"
-        executionsafe = self.execution in MoraxExecutionDict[ClusterComponent.SMU]
+        executionsafe = self.execution in MoraxExecutionDict[ClusterComponent.VPU]
         tasksafe = self.tasksize <= HWDicts["LaneNum"]
         return dfsafe and executionsafe and tasksafe
 
 
 class SubQueryExcuteOnSMU(SubQueryExcute):
     def __init__(
-        self, _layertype, _tasklabel: str, _dfmod: str, _execution, _tasksize: float
+        self,
+        _layerclass,
+        _tasklabel: str,
+        _dfmod: str,
+        _execution,
+        _tasksize: tuple(float, float),
     ):
-        super().__init__(_layertype, _tasklabel)
+        super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
         self.tasksize = _tasksize
@@ -129,26 +149,29 @@ class SubQueryExcuteOnSMU(SubQueryExcute):
 
 
 class SubQueryClusterTransfer:
-    def __init__(self, _bulklabel, _bulksize, _fromCluster, _toCluster):
+    def __init__(self, _bulklabel, _bulksize, _Cluster):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
-        self.fromCluster = _fromCluster
-        self.toCluster = _toCluster
+        self.Cluster = _Cluster
 
 
-class SubQueryClusterTransfer:
+class SubQueryReadDRAM:
     def __init__(self, _bulklabel, _bulksize, _toCluster):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
         self.toCluster = _toCluster
 
 
-# _edges: [vertex1, (vertex2, ...)]
+# edges: [vertex1, (vertex2, ...)]
 # vertex: {'idx': , 'type': , 'location': }
 class Query:
     def __init__(self, _layerclass, _location, _edges) -> None:
         self.index = _layerclass.layer_index
-        self.query
+        self.querylist = []
+
+    def compile_query():
+        # generate subqueries of this layer
+        return
 
 
 def generate_queries(_model_list, _assignment_list):
