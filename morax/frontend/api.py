@@ -15,15 +15,15 @@ import subprocess as SP
 from torch._C import CONV_BN_FUSION
 import morax.model.layer as Lyr
 import morax.model.model as Model
-from morax.frontend.csvparser import apd_is_index2
-from morax.model.layer import MXLCD, MXLTD, MXNTD
+from morax.frontend.csvparser import apdidx2_is_index2
+from morax.model.layer import mxLCD_CNN, mxLCD_GEMM, mxLTD, mxNTD
 
 
-def read_morax_csv(_modelpath, _modelname, _isbn=False):
-    if _isbn is True:
-        csv = _modelname + '_mora.csv'
+def read_morax_csv(_modelpath, _modelname, _isnorm=False):
+    if _isnorm is True:
+        csv = _modelname + "_norm.csv"
     else:
-        csv = _modelname + '.csv'
+        csv = _modelname + ".csv"
     morax_csv_path = os.path.abspath(os.path.join(_modelpath, csv))
     model_df = pd.read_csv(morax_csv_path)
     model_nd = model_df.to_numpy()
@@ -33,99 +33,179 @@ def read_morax_csv(_modelpath, _modelname, _isbn=False):
 
 def make_model(_model, _modeltype, _layernum, _model_nd):
     model_dag = Model.ModelDAG(_model, _modeltype)
-    model_list = Model.LayerList(_model, _modeltype)
+    model_list = Model.ModelList(_model, _modeltype)
+    model_dag.add_vlayer()
+    model_list.add_vlayer()
+
     for idx in range(_layernum):
         line = _model_nd[idx, ...]
-        layertype = MXLTD[line[MXLCD['TYP']]] if line[MXLCD['TYP']] >= 0 else MXNTD[line[MXLCD['TYP']]]
+        typeint = (
+            mxLCD_CNN["TYP"] if _modeltype == Model.ModelType.CNN else mxLCD_GEMM["TYP"]
+        )
+        layertype = mxLTD[line[typeint]] if line[typeint] >= 0 else mxNTD[line[typeint]]
         # add layer
-        if layertype == 'Linear':
+        if layertype == "Linear":
             layername = layertype + str(idx)
             linearlayer = Lyr.Linear(layername, idx, Lyr.LinearLayerType.Linear, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'CONV':
+        if layertype == "CONV":
             layername = layertype + str(idx)
             linearlayer = Lyr.CONV(layername, idx, Lyr.LinearLayerType.CONV, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'DWCONV':
+        if layertype == "DWCONV":
             layername = layertype + str(idx)
             linearlayer = Lyr.DWCONV(layername, idx, Lyr.LinearLayerType.DWCONV, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'Residual':
+        if layertype == "Residual":
             layername = layertype + str(idx)
-            linearlayer = Lyr.Residual(layername, idx, Lyr.LinearLayerType.Residual, line)
+            linearlayer = Lyr.Residual(
+                layername, idx, Lyr.LinearLayerType.Residual, line
+            )
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'Batchnorm':
+        if layertype == "Batchnorm":
             layername = layertype + str(idx)
-            linearlayer = Lyr.Batchnorm(layername, idx, Lyr.LinearLayerType.Batchnorm, line)
+            linearlayer = Lyr.Batchnorm(
+                layername, idx, Lyr.LinearLayerType.Batchnorm, line
+            )
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'TRCONV':
+        if layertype == "TRCONV":
             layername = layertype + str(idx)
             linearlayer = Lyr.TRCONV(layername, idx, Lyr.LinearLayerType.TRCONV, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'NGCONV':
+        if layertype == "NGCONV":
             layername = layertype + str(idx)
             linearlayer = Lyr.NGCONV(layername, idx, Lyr.LinearLayerType.NGCONV, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'TRCONV':
+        if layertype == "TRCONV":
             layername = layertype + str(idx)
             linearlayer = Lyr.TRCONV(layername, idx, Lyr.LinearLayerType.TRCONV, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'VDP':
+        if layertype == "VDP":
             layername = layertype + str(idx)
             linearlayer = Lyr.VDP(layername, idx, Lyr.LinearLayerType.VDP, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'VADD':
+        if layertype == "VADD":
             layername = layertype + str(idx)
             linearlayer = Lyr.VADD(layername, idx, Lyr.LinearLayerType.VADD, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'VMUL':
+        if layertype == "VMUL":
             layername = layertype + str(idx)
             linearlayer = Lyr.VMUL(layername, idx, Lyr.LinearLayerType.VMUL, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'GEMM':
+        if layertype == "VMM":
+            layername = layertype + str(idx)
+            linearlayer = Lyr.VMM(layername, idx, Lyr.LinearLayerType.VMM, line)
+            model_list.add_layer(copy.deepcopy(linearlayer))
+            model_dag.add_layer(idx, True)
+        if layertype == "GEMM":
             layername = layertype + str(idx)
             linearlayer = Lyr.GEMM(layername, idx, Lyr.LinearLayerType.GEMM, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'Layernorm':
+        if layertype == "MADD":
             layername = layertype + str(idx)
-            linearlayer = Lyr.Layernorm(layername, idx, Lyr.LinearLayerType.Layernorm, line)
+            linearlayer = Lyr.MADD(layername, idx, Lyr.LinearLayerType.MADD, line)
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-        if layertype == 'Pooling':
+        if layertype == "Layernorm":
             layername = layertype + str(idx)
-            nonlinearlayer = Lyr.Pooling(layername, idx, Lyr.NonlinearLayerType.Pooling, line)
+            linearlayer = Lyr.Layernorm(
+                layername, idx, Lyr.LinearLayerType.Layernorm, line
+            )
+            model_list.add_layer(copy.deepcopy(linearlayer))
+            model_dag.add_layer(idx, True)
+        if layertype == "Pooling":
+            layername = layertype + str(idx)
+            nonlinearlayer = Lyr.Pooling(
+                layername, idx, Lyr.NonlinearLayerType.Pooling, line
+            )
             model_list.add_layer(copy.deepcopy(nonlinearlayer))
             model_dag.add_layer(idx, False)
-        if layertype == 'Softmax1D':
+        if layertype == "Softmax1D":
             layername = layertype + str(idx)
-            nonlinearlayer = Lyr.Softmax1D(layername, idx, Lyr.NonlinearLayerType.Softmax1D, line)
+            nonlinearlayer = Lyr.Softmax1D(
+                layername, idx, Lyr.NonlinearLayerType.Softmax1D, line
+            )
             model_list.add_layer(copy.deepcopy(nonlinearlayer))
             model_dag.add_layer(idx, False)
-        if layertype == 'Softmax2D':
+        if layertype == "Softmax2D":
             layername = layertype + str(idx)
-            nonlinearlayer = Lyr.Softmax2D(layername, idx, Lyr.NonlinearLayerType.Softmax2D, line)
+            nonlinearlayer = Lyr.Softmax2D(
+                layername, idx, Lyr.NonlinearLayerType.Softmax2D, line
+            )
             model_list.add_layer(copy.deepcopy(nonlinearlayer))
             model_dag.add_layer(idx, False)
+        if layertype == "CONCAT":
+            # KEYPOINT: INSERT MULTI-HEAD add vIDX
+            layername = layertype + str(idx)
+            linearlayer = Lyr.CONCAT(
+                layername, idx, Lyr.LinearLayerType.Layernorm, line
+            )
+            model_list.add_layer(copy.deepcopy(linearlayer))
+            model_dag.add_layer(idx, True)
+            outofrangeidx = _layernum + 42
+            attentionlayer = -linearlayer.input_indecies_tuple[0]
+            for hd in range(linearlayer.head):  # 0 ~ head-1
+                for attentionidx in range(attentionlayer):
+                    model_dag.add_layer(
+                        outofrangeidx + attentionidx + hd * attentionlayer,
+                        True,  # TODO: Softmax False
+                    )
+
         # add edge
-        preidx = line[MXLCD['IDX']] + idx
-        assert preidx < idx
-        model_dag.add_edge(preidx, idx)
-        if apd_is_index2(layertype, line[MXLCD['APD']]):
-            apdidx = line[MXLCD['APD']] + idx
-            assert apdidx < idx
-            model_dag.add_edge(apdidx, idx)
-    assert model_dag.layernum == model_list.layernum
-    assert model_dag.layernum == _layernum
+        if layertype != "CONCAT":
+            eidxint = (
+                mxLCD_CNN["IDX"]
+                if _modeltype == Model.ModelType.CNN
+                else mxLCD_GEMM["IDX1"]
+            )
+            preidx = line[eidxint] + idx
+            if preidx < idx:
+                model_dag.add_edge(preidx, idx)
+            else:
+                model_dag.add_edge(-1, idx)  # -1 is a vNode for begin token
+
+            if apdidx2_is_index2(layertype, line[eidxint + 1]):
+                preidx2 = line[eidxint + 1] + idx
+                assert preidx2 < idx
+                model_dag.add_edge(preidx2, idx)
+
+        elif layertype == "CONCAT":
+            #  add first head last layer edge to concat layer
+            model_dag.add_edge(idx - 1, idx)
+            # add left heads
+            outofrange_idx = _layernum + 42
+            head = line[mxLCD_GEMM["M"]]
+            attentionlayer = -line[mxLCD_GEMM["IDX1"]]
+            head1begin_idx = idx - attentionlayer
+            attentioninput_idx = _model_nd[head1begin_idx, mxLCD_GEMM["IDX1"]]
+            for hd in range(head - 1):
+                headxbegin_idx = outofrange_idx + attentionlayer * hd
+                if attentioninput_idx == 0:
+                    model_dag.add_edge(-1, headxbegin_idx)
+                else:
+                    model_dag.add_edge(
+                        attentioninput_idx + head1begin_idx, headxbegin_idx
+                    )
+                for atl in range(attentionlayer):
+                    this_idx = headxbegin_idx + atl
+                    for _idx in model_dag[head1begin_idx + atl]:
+                        that_idx = (
+                            headxbegin_idx + _idx if atl < attentionlayer - 1 else idx
+                        )
+                        model_dag.add_edge(this_idx, that_idx)
+
+    # assert model_dag.layernum == model_list.layernum
+    # assert model_dag.layernum == _layernum
     return model_dag, model_list

@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as Func
 
-morax_layer_csv_dicts = {
+morax_layer_csv_dicts_cnn = {
     "IC": 0,
     "OC": 1,
     "FS": 2,
@@ -24,8 +24,18 @@ morax_layer_csv_dicts = {
     "RP": 6,
     "IDX": 7,
     "APD": 8,
-}
-# MXLCD
+}  # mxLCD_CNN
+
+morax_gemm_layer_csv_dicts_gemm = {
+    "M": 0,
+    "N": 1,
+    "K": 2,
+    "TYP": 3,
+    "ACT": 4,
+    "IDX1": 5,
+    "IDX2": 6,
+}  # mxLCD_GEMM
+
 morax_linearlayer_type_dicts = {
     0: "Linear",
     1: "CONV",
@@ -37,9 +47,12 @@ morax_linearlayer_type_dicts = {
     7: "VDP",
     8: "VADD",
     9: "VMUL",
-    10: "GEMM",
-    11: "Layernorm",
-}  # MXLTD
+    10: "VMM",
+    11: "GEMM",
+    12: "MADD",
+    13: "Layernorm",
+    14: "CONCAT",
+}  # mxLTD
 
 morax_nonlinearlayer_type_dicts = {
     -1: "Pooling",
@@ -48,19 +61,12 @@ morax_nonlinearlayer_type_dicts = {
     # 1: 'relu',
     # 1: 'tanh',
     # 2: 'sigmoid',
-}  # MXNTD
+}  # mxNTD
 
-MXLCD = morax_layer_csv_dicts
-MXLTD = morax_linearlayer_type_dicts
-MXNTD = morax_nonlinearlayer_type_dicts
-
-
-class ModelType(Enum):
-    MLP = 0
-    CNN = 1
-    RNN = 2
-    LSTM = 3
-    MHATTENTION = 4
+mxLCD_CNN = morax_layer_csv_dicts_cnn
+mxLCD_GEMM = morax_gemm_layer_csv_dicts_gemm
+mxLTD = morax_linearlayer_type_dicts
+mxNTD = morax_nonlinearlayer_type_dicts
 
 
 class LinearLayerType(Enum):
@@ -75,9 +81,11 @@ class LinearLayerType(Enum):
     VDP = 7
     VADD = 8
     VMUL = 9
-    GEMM = 10
-    MADD = 11
-    Layernorm = 12
+    VMM = 10
+    GEMM = 11
+    MADD = 12
+    Layernorm = 13
+    CONCAT = 14
 
 
 class NonlinearLayerType(Enum):
@@ -101,117 +109,144 @@ class LinearLayer(Layer):
         self.layer_csvline = _layercsvline
 
 
+"""CONV based Models"""
+
+
 class Linear(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.row_dim = self.layer_csvline[MXLCD["IC"]]
-        self.col_dim = self.layer_csvline[MXLCD["OC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.row_dim = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.col_dim = self.layer_csvline[mxLCD_CNN["OC"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
 
 
 class CONV(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.in_channel = self.layer_csvline[MXLCD["IC"]]
-        self.out_channel = self.layer_csvline[MXLCD["OC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.kernel_size = self.layer_csvline[MXLCD["KS"]]
-        self.stride = self.layer_csvline[MXLCD["STR"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.in_channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.out_channel = self.layer_csvline[mxLCD_CNN["OC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.kernel_size = self.layer_csvline[mxLCD_CNN["KS"]]
+        self.stride = self.layer_csvline[mxLCD_CNN["STR"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_CNN["IDX"]],
+            self.layer_csvline[mxLCD_CNN["APD"]],
         )
 
 
 class DWCONV(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.channel = self.layer_csvline[MXLCD["IC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.kernel_size = self.layer_csvline[MXLCD["KS"]]
-        self.stride = self.layer_csvline[MXLCD["STR"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.kernel_size = self.layer_csvline[mxLCD_CNN["KS"]]
+        self.stride = self.layer_csvline[mxLCD_CNN["STR"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
 
 
 class Residual(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.channel = self.layer_csvline[MXLCD["IC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_CNN["IDX"]],
+            self.layer_csvline[mxLCD_CNN["APD"]],
         )
 
 
 class Batchnorm(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.channel = self.layer_csvline[MXLCD["IC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
 
 
 class TRCONV(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.in_channel = self.layer_csvline[MXLCD["IC"]]
-        self.out_channel = self.layer_csvline[MXLCD["OC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.kernel_size = self.layer_csvline[MXLCD["KS"]]
-        self.stride = self.layer_csvline[MXLCD["STR"]]
-        self.dilation = self.layer_csvline[MXLCD["APD"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.in_channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.out_channel = self.layer_csvline[mxLCD_CNN["OC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.kernel_size = self.layer_csvline[mxLCD_CNN["KS"]]
+        self.stride = self.layer_csvline[mxLCD_CNN["STR"]]
+        self.dilation = self.layer_csvline[mxLCD_CNN["APD"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
 
 
 class NGCONV(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.in_channel = self.layer_csvline[MXLCD["IC"]]
-        self.out_channel = self.layer_csvline[MXLCD["OC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.kernel_size = self.layer_csvline[MXLCD["KS"]]
-        self.stride = self.layer_csvline[MXLCD["STR"]]
-        self.group = self.layer_csvline[MXLCD["APD"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.in_channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.out_channel = self.layer_csvline[mxLCD_CNN["OC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.kernel_size = self.layer_csvline[mxLCD_CNN["KS"]]
+        self.stride = self.layer_csvline[mxLCD_CNN["STR"]]
+        self.group = self.layer_csvline[mxLCD_CNN["APD"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
+
+
+"""GEMM based Models"""
 
 
 class VDP(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.v_dim = self.layer_csvline[MXLCD["IC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.v_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
         )
 
 
 class VADD(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.v_dim = self.layer_csvline[MXLCD["IC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.v_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
         )
 
 
 class VMUL(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.v_dim = self.layer_csvline[MXLCD["IC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.v_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
+        )
+
+
+class VMM(LinearLayer):
+    def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
+        LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
+        self.v_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.row_dim = self.v_dim
+        self.col_dim = self.layer_csvline[mxLCD_GEMM["N"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
+        self.input_indecies_tuple = (
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
         )
 
 
@@ -219,13 +254,15 @@ class GEMM(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
         # MK * KN
-        self.m_dim = self.layer_csvline[MXLCD["IC"]]
-        self.n_dim = self.layer_csvline[MXLCD["OC"]]
-        self.k_dim = self.layer_csvline[MXLCD["FS"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.m_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.n_dim = self.layer_csvline[mxLCD_GEMM["N"]]
+        self.k_dim = self.layer_csvline[mxLCD_GEMM["K"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
         )
 
 
@@ -233,23 +270,36 @@ class MADD(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
         # MK * KN
-        self.m_dim = self.layer_csvline[MXLCD["IC"]]
-        self.n_dim = self.layer_csvline[MXLCD["OC"]]
-        self.k_dim = self.layer_csvline[MXLCD["FS"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
+        self.row_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.col_dim = self.layer_csvline[mxLCD_GEMM["N"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (
-            self.layer_csvline[MXLCD["IDX"]],
-            self.layer_csvline[MXLCD["APD"]],
+            self.layer_csvline[mxLCD_GEMM["IDX1"]],
+            self.layer_csvline[mxLCD_GEMM["IDX2"]],
         )
 
 
 class Layernorm(LinearLayer):
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
-        self.channel = self.layer_csvline[MXLCD["IC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.row_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.col_dim = self.layer_csvline[mxLCD_GEMM["N"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_GEMM["IDX1"]], 0)
+
+
+class CONCAT(LinearLayer):
+    def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
+        LinearLayer.__init__(self, _layername, _layerindex, _layertype, _layercsvline)
+        self.head = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_GEMM["IDX1"]], 0)
+
+
+"""NON-LINEAR LAYER TYPE"""
 
 
 class NonlinearLayer(Layer):
@@ -261,36 +311,38 @@ class NonlinearLayer(Layer):
         self.layer_csvline = _layercsvline
 
 
-class Pooling(NonlinearLayer):
+class Pooling(NonlinearLayer):  # CNN
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         NonlinearLayer.__init__(
             self, _layername, _layerindex, _layertype, _layercsvline
         )
-        self.channel = self.layer_csvline[MXLCD["IC"]]
-        self.feature_size = self.layer_csvline[MXLCD["FS"]]
-        self.kernel_size = self.layer_csvline[MXLCD["KS"]]
-        self.stride = self.layer_csvline[MXLCD["STR"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.channel = self.layer_csvline[mxLCD_CNN["IC"]]
+        self.feature_size = self.layer_csvline[mxLCD_CNN["FS"]]
+        self.kernel_size = self.layer_csvline[mxLCD_CNN["KS"]]
+        self.stride = self.layer_csvline[mxLCD_CNN["STR"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
 
 
-class Softmax1D(NonlinearLayer):
+class Softmax1D(NonlinearLayer):  # MLP
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         NonlinearLayer.__init__(
             self, _layername, _layerindex, _layertype, _layercsvline
         )
-        self.v_dim = self.layer_csvline[MXLCD["IC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.v_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_GEMM["IDX1"]], 0)
 
 
-class Softmax2D(NonlinearLayer):
+class Softmax2D(NonlinearLayer):  # MLP
     def __init__(self, _layername, _layerindex, _layertype, _layercsvline) -> None:
         NonlinearLayer.__init__(
             self, _layername, _layerindex, _layertype, _layercsvline
         )
-        self.row_dim = self.layer_csvline[MXLCD["IC"]]
-        self.col_dim = self.layer_csvline[MXLCD["OC"]]
-        self.is_activated = False if self.layer_csvline[MXLCD["RP"]] == 0 else True
-        self.input_indecies_tuple = (self.layer_csvline[MXLCD["IDX"]], 0)
+        self.row_dim = self.layer_csvline[mxLCD_GEMM["M"]]
+        self.col_dim = self.layer_csvline[mxLCD_GEMM["N"]]
+        self.is_activated = False if self.layer_csvline[mxLCD_GEMM["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_GEMM["IDX1"]], 0)
 

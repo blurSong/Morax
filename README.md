@@ -4,7 +4,7 @@
 
 ##### csv name    
 **model.csv**   
-if model has BN/LN layer, use **mode_bn/ln.csv**
+if model has BN/LN layer, use **mode_norm.csv**
 
 #### CONV Model                            
 1. How to fill **[IC OC FS KS STR]**  
@@ -71,16 +71,16 @@ if model has BN/LN layer, use **mode_bn/ln.csv**
     M: Head Number  
     IDX1: index of the beginning of head layer
 
-| Layer              | M   | N   | K   | TYP | ACT | IDX1 | IDX2 | Note |
-| ------------------ | --- | --- | --- | --- | --- | ---- | ---- | ---- |
-| VDP [7]            | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
-| VADD [8]           | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
-| VMUL [9]           | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
-| VMM [0] (= Linear) | M   | N   |     | TYP | ACT | IDX1 | IDX2 |      |
-| GEMM [10]          | M   | N   | K   | TYP | ACT | IDX1 | IDX2 |      |
-| MADD [11]          | M   | N   | K   | TYP | ACT | IDX1 | IDX2 |      |
-| Layernorm  [12]    | M   | N   |     | TYP | ACT | IDX1 | IDX2 |      |
-| CONCAT  [13]       | M   |     |     | TYP |     | IDX1 |      |      |
-|                    |     |     |     |     |     |      |      |      |
-| Softmax1d [-2]     | M   |     |     | TYP | ACT | IDX  |      |      |
-| Softmax2d  [-3]    | M   | N   |     | TYP | ACT | IDX  |      |      |
+| Layer               | M   | N   | K   | TYP | ACT | IDX1 | IDX2 | Note |
+| ------------------- | --- | --- | --- | --- | --- | ---- | ---- | ---- |
+| VDP [7]             | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
+| VADD [8]            | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
+| VMUL [9]            | M   |     |     | TYP | ACT | IDX1 | IDX2 |      |
+| VMM [10] (= Linear) | M   | N   |     | TYP | ACT | IDX1 | IDX2 |      |
+| GEMM [11]           | M   | N   | K   | TYP | ACT | IDX1 | IDX2 |      |
+| MADD [12]           | M   | N   |     | TYP | ACT | IDX1 | IDX2 |      |
+| Layernorm  [13]     | M   | N   |     | TYP | ACT | IDX1 |      |      |
+| CONCAT  [14]        | M   |     |     | TYP |     | IDX1 |      |      |
+|                     |     |     |     |     |     |      |      |      |
+| Softmax1d [-2]      | M   |     |     | TYP | ACT | IDX1 |      |      |
+| Softmax2d  [-3]     | M   | N   |     | TYP | ACT | IDX1 |      |      |

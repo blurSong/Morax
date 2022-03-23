@@ -64,7 +64,9 @@ MoraxExecutionDict = {
         LLT.VDP,
         LLT.VADD,
         LLT.VMUL,
+        LLT.VMM,
         NLT.Pooling,
         NLT.Softmax1D,
+        NLT.Softmax2D,
     ],
 }

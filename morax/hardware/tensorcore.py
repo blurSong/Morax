@@ -16,8 +16,6 @@ from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 from morax.system.timefilm import TimeFilm, TimeStamp
 from typing import Dict
 
-int64 = np.int64
-
 TCExe = MoraxExecutionDict[ClusterComponent.TensorCore]
 
 
@@ -99,4 +97,6 @@ class PEArray():
 
 class TensorCore():
 
+
+class TensorCoreNOC():
 

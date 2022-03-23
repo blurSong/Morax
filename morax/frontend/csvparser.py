@@ -20,8 +20,8 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
     # add pooling layer to csv and reconstruct csv index
     # mora.csv -> morax.csv
     if _isbn is True:
-        moracsvname = _modelname + "_bn.csv"
-        moraxcsvname = _modelname + "_bn_pl.csv"
+        moracsvname = _modelname + "_norm.csv"
+        moraxcsvname = _modelname + "_norm_pl.csv"
     else:
         moracsvname = _modelname + ".csv"
         moraxcsvname = _modelname + "_pl.csv"
@@ -35,7 +35,7 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
             for tmpidx in range(layer["IDX"] + 1, 0, 1):  # -IDX + 1 ~ -1
                 if model_df.at[idx + tmpidx, "RP"] >= 2:
                     model_df.at[idx, "IDX"] -= 1
-        if apd_is_index2(MXLTD[layer["TYP"]], layer["APD"]):
+        if apdidx2_is_index2(MXLTD[layer["TYP"]], layer["APD"]):
             for tmpidx in range(layer["APD"] + 1, 0, 1):
                 if model_df.at[idx + tmpidx, "RP"] >= 2:
                     model_df.at[idx, "APD"] -= 1
@@ -78,7 +78,7 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
 
 def remove_bn_to_csv(_modelpath, _model):
     # remove bn layer and reconstruct csv for 2 simulators
-    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_bn.csv"))
+    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_norm.csv"))
     model_csv_path_nobn = os.path.abspath(os.path.join(_modelpath, _model + ".csv"))
     model_df = pd.read_csv(model_csv_path)
     # 1. refill ReLU pooling to previous layer
@@ -101,7 +101,7 @@ def remove_bn_to_csv(_modelpath, _model):
                 # old problem from noob MNSIM
                 # if model_df.at[idx + tmpidx, 'RP'] > 0:
                 #    model_df.at[idx, 'IDX'] -= 1 if model_df.at[idx + tmpidx, 'RP'] == 1 else 2
-        if apd_is_index2(MXLTD[layer["TYP"]], layer["APD"]):
+        if apdidx2_is_index2(MXLTD[layer["TYP"]], layer["APD"]):
             for tmpidx in range(layer["APD"] + 1, 0, 1):
                 if MXLTD[model_df.at[idx + tmpidx, "TYP"]] == "Batchnorm":
                     model_df.at[idx, "APD"] += 1
@@ -109,55 +109,52 @@ def remove_bn_to_csv(_modelpath, _model):
                 #    layer['APD'] -= 1 if model_df.at[idx + tmpidx, 'RP'] == 1 else 2
     model_df = model_df.drop(model_df[model_df["TYP"] == 4].index)
     model_df.to_csv(model_csv_path_nobn, index=False)
-    print("[Morax][Front] reconstruct model_bn.csv -> model.csv.")
+    print("[Morax][Front] remove Batchnorm model_norm.csv -> model.csv.")
     return
 
 
 def remove_ln_to_csv(_modelpath, _model):
     # remove bn layer and reconstruct csv for 2 simulators
-    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_ln.csv"))
+    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_norm.csv"))
     model_csv_path_nobn = os.path.abspath(os.path.join(_modelpath, _model + ".csv"))
     model_df = pd.read_csv(model_csv_path)
     # 1. refill ReLU pooling to previous layer
     # 2. refill index to next layer
     for idx, layer in model_df.iterrows():
         if MXLTD[layer["TYP"]] == "Layernorm":
-            assert layer["IDX"] == -1, "[Morax][Front] Layernorm idx is not -1."
-            assert (
-                model_df.at[idx + layer["IDX"], "RP"] == 0
-            ), "[Mora][Front] ConvBNReLU, conv layer {0} RP is not 0.".format(
-                idx + layer["IDX"]
-            )
-            model_df.at[idx + layer["IDX"], "RP"] = layer["RP"]
-            model_df.at[idx, "RP"] = 0
+            assert layer["IDX1"] == -1, "[Morax][Front] Layernorm idx is not -1."
+            model_df.at[idx + layer["IDX"], "ACT"] = layer["ACT"]
+            model_df.at[idx, "ACT"] = 0
     for idx, layer in model_df.iterrows():
-        if layer["IDX"] != -1:
-            for tmpidx in range(layer["IDX"] + 1, 0, 1):
+        if layer["IDX1"] != -1:
+            for tmpidx in range(layer["IDX1"] + 1, 0, 1):
                 if MXLTD[model_df.at[idx + tmpidx, "TYP"]] == "Layernorm":
-                    model_df.at[idx, "IDX"] += 1
+                    model_df.at[idx, "IDX1"] += 1
                 # old problem from noob MNSIM
                 # if model_df.at[idx + tmpidx, 'RP'] > 0:
                 #    model_df.at[idx, 'IDX'] -= 1 if model_df.at[idx + tmpidx, 'RP'] == 1 else 2
-        if apd_is_index2(MXLTD[layer["TYP"]], layer["APD"]):
-            for tmpidx in range(layer["APD"] + 1, 0, 1):
+        if apdidx2_is_index2(MXLTD[layer["TYP"]], layer["IDX2"]):
+            for tmpidx in range(layer["IDX2"] + 1, 0, 1):
                 if MXLTD[model_df.at[idx + tmpidx, "TYP"]] == "Layernorm":
-                    model_df.at[idx, "APD"] += 1
+                    model_df.at[idx, "IDX2"] += 1
                 # if model_df.at[idx + tmpidx, 'RP'] > 0:
                 #    layer['APD'] -= 1 if model_df.at[idx + tmpidx, 'RP'] == 1 else 2
-    model_df = model_df.drop(model_df[model_df["TYP"] == 4].index)
+    model_df = model_df.drop(model_df[model_df["TYP"] == 13].index)
     model_df.to_csv(model_csv_path_nobn, index=False)
-    print("[Morax][Front] reconstruct model_ln.csv -> model.csv.")
+    print("[Morax][Front] remove Layernorm model_norm.csv -> model.csv.")
     return
 
 
-def apd_is_index2(type, apd):
+def apdidx2_is_index2(type, apd):
     return (
         type == "CONV"
         or type == "Residual"
         or type == "VDP"
         or type == "VADD"
         or type == "VMUL"
+        or type == "VMM"
         or type == "GEMM"
+        or type == "MADD"
     ) and (apd != 0)
 
 
