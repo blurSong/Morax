@@ -29,7 +29,7 @@ from hardware.cluster import HWDicts
 # tasklabel = modelname_'L'+layeridx_'T'+taskidx_taskform
 
 
-class SubQueryRead:
+class QueryRead:
     def __init__(self, _bulksize, _bulklabel, _locationEnum, _toEnum):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
@@ -37,7 +37,7 @@ class SubQueryRead:
         self.toEnum = _toEnum
 
 
-class SubQueryWrite:
+class QueryWrite:
     def __init__(self, _bulksize, _bulklabel, _locationEnum, _toEnum):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
@@ -45,7 +45,7 @@ class SubQueryWrite:
         self.toEnum = _toEnum
 
 
-class SubQueryExcute:
+class QueryExcute:
     def __init__(self, _layerclass, _tasklabel: str):
         self.tasklabel = _tasklabel
         self.layerclass = copy.deepcopy(_layerclass)
@@ -56,7 +56,7 @@ class SubQueryExcute:
         return form
 
 
-class SubQueryExcuteOnTC(SubQueryExcute):
+class QueryExcuteOnTC(QueryExcute):
     def __init__(
         self,
         _layerclass,
@@ -80,7 +80,7 @@ class SubQueryExcuteOnTC(SubQueryExcute):
         return dfsafe and executionsafe and tasksafe
 
 
-class SubQueryExcuteOnNVTC(SubQueryExcute):
+class QueryExcuteOnNVTC(QueryExcute):
     def __init__(
         self,
         _layerclass,
@@ -104,7 +104,7 @@ class SubQueryExcuteOnNVTC(SubQueryExcute):
         return dfsafe and executionsafe and tasksafe
 
 
-class SubQueryExcuteOnVPU(SubQueryExcute):
+class QueryExcuteOnVPU(QueryExcute):
     def __init__(
         self,
         _layerclass,
@@ -126,7 +126,7 @@ class SubQueryExcuteOnVPU(SubQueryExcute):
         return dfsafe and executionsafe and tasksafe
 
 
-class SubQueryExcuteOnSMU(SubQueryExcute):
+class QueryExcuteOnSMU(QueryExcute):
     def __init__(
         self,
         _layerclass,
@@ -148,14 +148,14 @@ class SubQueryExcuteOnSMU(SubQueryExcute):
         return dfsafe and executionsafe and tasksafe
 
 
-class SubQueryClusterTransfer:
+class QueryClusterTransfer:
     def __init__(self, _bulklabel, _bulksize, _Cluster):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
         self.Cluster = _Cluster
 
 
-class SubQueryReadDRAM:
+class QueryReadDRAM:
     def __init__(self, _bulklabel, _bulksize, _toCluster):
         self.bulksize = _bulksize
         self.bulklabel = _bulklabel
@@ -164,7 +164,7 @@ class SubQueryReadDRAM:
 
 # edges: [vertex1, (vertex2, ...)]
 # vertex: {'idx': , 'type': , 'location': }
-class Query:
+class LayerQuery:
     def __init__(self, _layerclass, _location, _edges) -> None:
         self.index = _layerclass.layer_index
         self.querylist = []
