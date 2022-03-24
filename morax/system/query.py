@@ -63,12 +63,12 @@ class QueryExcuteOnTC(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(float, float),
+        _tasksizelist: list(tuple(int, int)),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize
+        self.tasksizelist = _tasksizelist
         assert self.checkquery() is True
 
     def checkquery(self):
@@ -87,12 +87,12 @@ class QueryExcuteOnNVTC(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(float, float),
+        _tasksizelist: list(tuple(int, int)),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize
+        self.tasksizelist = _tasksizelist
         assert self.checkquery() is True
 
     def checkquery(self):
@@ -111,7 +111,7 @@ class QueryExcuteOnVPU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(float, float),
+        _tasksize: tuple(int, int),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
@@ -133,7 +133,7 @@ class QueryExcuteOnSMU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(float, float),
+        _tasksize: tuple(int, int),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
