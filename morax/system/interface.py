@@ -37,8 +37,15 @@ class SystemOperator(Enum):
     Vnorm = 106
 
 
+class BufferOperator(Enum):
+    Write = 0
+    Read = 1
+
+
 CC = ClusterComponent
 SO = SystemOperator
+BO = BufferOperator
+
 
 MoraxExecutionDict = {
     CC.TensorCore: [

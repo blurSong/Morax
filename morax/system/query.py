@@ -13,12 +13,13 @@ import subprocess as SP
 from morax.system.interface import MoraxExecutionDict, ClusterComponent
 from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 from morax.system.config import MoraxConfig, HWParam
+from morax.hardware.buffer import DataBulk
 
 # [bulk]
 # indicate the data form of input and weight
 # bulkfrom = (part or whole) feature: NCHW  weight: KCRS  MVM & GEMM: TODO
 # dataname = W or F or TODO
-# bulklabel = modelname_'L'+layeridx_'dataname'+bulkidx_bulksizekB_bulkfrom
+# bulklabel = modelname_'L'+layeridx_'dataname'+bulkidx_bulksizeByte_bulkfrom
 
 # [task]
 # indicate the task excution scale using [output]
@@ -29,18 +30,10 @@ from morax.system.config import MoraxConfig, HWParam
 # tasklabel = modelname_'L'+layeridx_'T'+taskidx_taskform
 
 
-class QueryRead:
-    def __init__(self, _bulksize, _bulklabel, _locationEnum, _toEnum):
-        self.bulksize = _bulksize
-        self.bulklabel = _bulklabel
-        self.locationEnum = _locationEnum
-        self.toEnum = _toEnum
-
-
-class QueryWrite:
-    def __init__(self, _bulksize, _bulklabel, _locationEnum, _toEnum):
-        self.bulksize = _bulksize
-        self.bulklabel = _bulklabel
+class QueryBuffer:
+    def __init__(self, _databulkclass: DataBulk, _execution, _locationEnum, _toEnum):
+        self.execution = _execution
+        self.databulkclass = _databulkclass
         self.locationEnum = _locationEnum
         self.toEnum = _toEnum
 
@@ -64,11 +57,13 @@ class QueryExcuteOnTC(QueryExcute):
         _dfmod: str,
         _execution,
         _tasksizelist: list(tuple(int, int)),
+        _bulksize,  # add 03.28
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
         self.tasksizelist = _tasksizelist
+        self.bulksize = _bulksize
         assert self.checkquery() is True
 
     def checkquery(self):

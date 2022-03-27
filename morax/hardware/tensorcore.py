@@ -206,9 +206,7 @@ class TensorCore:
         self.NOC = TensorCoreNOC()
         self.TimeFilm = TimeFilm()
 
-    def run_query(
-        self, _qclass_tc: QueryExcuteOnTC, _issue_t: int = 0, _bulksize: int = 0
-    ) -> int:
+    def run_query(self, _qclass_tc: QueryExcuteOnTC, _issue_t: int) -> int:
         """_qclass_tc:
         class QueryExcuteOnTC(QueryExcute)
         # layerclass,
@@ -216,6 +214,7 @@ class TensorCore:
         # dfmod: str,
         # execution: Enum
         # tasksizelist: list(tuple(int, int))
+        # bulksize :added 03.28
         """
         # 1. parse query
         query_tc = copy.deepcopy(_qclass_tc)
@@ -233,7 +232,7 @@ class TensorCore:
             sq_pearraylist.append(copy.deepcopy(sq_pearray))
         # 2. justify invoke time
         q_noc = {"tasklabel": query_tc.tasklabel, "tasksizelist": query_tc.tasksizelist}
-        invoke_t = self.NOC.run_query(q_noc, _issue_t, _bulksize)
+        invoke_t = self.NOC.run_query(q_noc, _issue_t, query_tc.bulksize)
         # 3. on-fly
         timestamp = TimeStamp(query_tc.execution, _issue_t, query_tc.tasklabel)
         for peid in range(self.pearraynum):
