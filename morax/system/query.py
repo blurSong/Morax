@@ -12,7 +12,7 @@ import pandas as pd
 import subprocess as SP
 from morax.system.interface import MoraxExecutionDict, ClusterComponent
 from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
-from hardware.cluster import HWDicts
+from morax.system.config import MoraxConfig, HWParam
 
 # [bulk]
 # indicate the data form of input and weight
@@ -76,7 +76,7 @@ class QueryExcuteOnTC(QueryExcute):
         executionsafe = (
             self.execution in MoraxExecutionDict[ClusterComponent.TensorCore]
         )
-        tasksafe = self.tasksize <= HWDicts["PEArrayNum"]
+        tasksafe = len(self.tasksizelist) <= MoraxConfig.PEArrayNum
         return dfsafe and executionsafe and tasksafe
 
 
@@ -87,20 +87,23 @@ class QueryExcuteOnNVTC(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksizelist: list(tuple(int, int)),
+        _nvtcid: int,
+        _sliceidlist,
+        # _tasksize: tuple(int, int),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksizelist = _tasksizelist
+        self.nvtcid = _nvtcid
+        self.sliceidlist = _sliceidlist
         assert self.checkquery() is True
 
     def checkquery(self):
-        dfsafe = self.dfmod == "Xbar" or self.dfmod == "LookUp"
+        dfsafe = self.dfmod == "Xbar" or self.dfmod == "LUT8" or self.dfmod == "LUT16"
         executionsafe = (
             self.execution in MoraxExecutionDict[ClusterComponent.nvTensorCore]
         )
-        tasksafe = self.tasksize <= HWDicts["RRAMSliceNum"]
+        tasksafe = len(self.sliceidlist) <= MoraxConfig.RRAMSliceNum
         return dfsafe and executionsafe and tasksafe
 
 
@@ -116,20 +119,20 @@ class QueryExcuteOnVPU(QueryExcute):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize
+        self.tasksize = _tasksize  #  (rowparts, collines)
         assert self.checkquery() is True
 
     def checkquery(self):
-        dfsafe = self.dfmod == "Para" or self.dfmod == "Reduce"
+        dfsafe = True if self.dfmod in ["Linear", "SoftMAX", "PostProcess"] else False
         executionsafe = self.execution in MoraxExecutionDict[ClusterComponent.VPU]
-        tasksafe = self.tasksize <= HWDicts["LaneNum"]
+        tasksafe = True
         return dfsafe and executionsafe and tasksafe
 
 
 class QueryExcuteOnSMU(QueryExcute):
     def __init__(
         self,
-        _layerclass,
+        _layerclass,  # Empty
         _tasklabel: str,
         _dfmod: str,
         _execution,
@@ -144,7 +147,7 @@ class QueryExcuteOnSMU(QueryExcute):
     def checkquery(self):
         dfsafe = self.dfmod == "UpStream" or self.dfmod == "DownStream"
         executionsafe = self.execution in MoraxExecutionDict[ClusterComponent.SMU]
-        tasksafe = self.tasksize <= HWDicts["SMUMaxIO"]
+        tasksafe = True
         return dfsafe and executionsafe and tasksafe
 
 

@@ -3,49 +3,43 @@
 # Author: Tao Song.
 # Last modification: 0324
 
-import sys
-from typing import Container
-import re
 import numpy as np
 import subprocess as SP
 import multiprocessing as MP
-import openpyxl
-import math
 import copy
 from morax.system.interface import MoraxExecutionDict, ClusterComponent
-from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 from morax.system.timefilm import TimeFilm, TimeStamp
-from typing import Dict, List
+from collections import UserDict, UserList
 from morax.system.query import QueryExcuteOnTC
+from morax.system.config import MoraxConfig, HWParam
 
 TCExe = MoraxExecutionDict[ClusterComponent.TensorCore]
 
 
-class PEArrayActionDict(Dict):
+class PEArrayActionDict:
     def __init__(self, _subtasklabel) -> None:
-        super().__init__()
         self.subtasklabel = _subtasklabel
-        self["MAC"] = 0
-        self["LBRead"] = 0
-        self["LBWrite"] = 0
-        self["RBActivate"] = 0
+        self.MAC = 0
+        self.LBRead = 0
+        self.LBWrite = 0
+        self.RBActivate = 0
 
 
-class NOCCastList(List):
+class NOCCastList(UserList):
     def __init__(self, _tasklabel) -> None:
         super().__init__()
         self.tasklabel = _tasklabel
 
 
 class PEArray:
-    def __init__(self, _peid: int, _pesize: int, _bufsize: int) -> None:
+    def __init__(self, _peid: int) -> None:
         self.peid = _peid
-        self.pesize = _pesize
-        self.localbufsize = _bufsize
-        self.rowbufsize = _pesize
+        self.pesize = MoraxConfig.PEArraySize
+        self.localbufsize = MoraxConfig.PEArrayBufferSizeKB
+        self.rowbufsize = self.pesize
         self.TimeFilm = TimeFilm()
         self.PEArrayActionList = []
-        self.busy = False
+        # self.busy = False
 
     def run_subquery(self, _q_pearray, _issue_t: int, _layerclass):
         # _q_pearray: dfmod: str, execution: Enum, subtasksize: tuple(int, int) subtasklabel: str
@@ -64,10 +58,10 @@ class PEArray:
             assert _q_pearray["dfmod"] == "Systolic"
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
-            ad["MAC"] = M * N
-            ad["LBRead"] = M + M * N
-            ad["LBWrite"] = N
-            ad["RBActivate"] = N
+            ad.MAC = M * N
+            ad.LBRead = M + M * N
+            ad.LBWrite = N
+            ad.RBActivate = N
             runtime = 1 + M + N + 1
         # LLT.CONV
         elif _q_pearray["execution"] == TCExe[1]:
@@ -76,10 +70,10 @@ class PEArray:
             N = _q_pearray["subtasksize"][1]
             K = _layerclass.kernel_size
             C = _layerclass.in_channel
-            ad["MAC"] = M * N * K * K * C
-            ad["LBRead"] = K * K * C + (N + K - 1) * (M + K - 1) * C
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = N * K * C
+            ad.MAC = M * N * K * K * C
+            ad.LBRead = K * K * C + (N + K - 1) * (M + K - 1) * C
+            ad.LBWrite = M * N
+            ad.RBActivate = N * K * C
             runtime = (min(N, M) - 1 + K * K) * C
         # LLT.DWCONV
         elif _q_pearray["execution"] == TCExe[2]:
@@ -87,29 +81,29 @@ class PEArray:
             N = _q_pearray["subtasksize"][1]
             K = _layerclass.kernel_size
             C = _layerclass.channel
-            ad["MAC"] = M * N * K * K
-            ad["LBRead"] = K * K + (N + K - 1) * (M + K - 1)
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = N * K
+            ad.MAC = M * N * K * K
+            ad.LBRead = K * K + (N + K - 1) * (M + K - 1)
+            ad.LBWrite = M * N
+            ad.RBActivate = N * K
             runtime = min(N, M) - 1 + K * K
         # LLT.Residual
         elif _q_pearray["execution"] == TCExe[3]:
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
             C = _layerclass.channel
-            ad["MAC"] = M * N
-            ad["LBRead"] = M * N * 2
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = 0
+            ad.MAC = M * N
+            ad.LBRead = M * N * 2
+            ad.LBWrite = M * N
+            ad.RBActivate = 0
             runtime = max(N, M)
         # LLT.Batchnorm
         elif _q_pearray["execution"] == TCExe[4]:
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
-            ad["MAC"] = M * N * 2
-            ad["LBRead"] = M * N
-            ad["LBWrite"] = N * N
-            ad["RBActivate"] = 0
+            ad.MAC = M * N * 2
+            ad.LBRead = M * N
+            ad.LBWrite = N * N
+            ad.RBActivate = 0
             runtime = max(N, M) + 1
         # LLT.TRCONV
         elif _q_pearray["execution"] == TCExe[5]:
@@ -118,10 +112,10 @@ class PEArray:
             KO = _layerclass.kernel_size
             KD = (KO + 1) * _layerclass.dilation - 1
             C = _layerclass.in_channel
-            ad["MAC"] = M * N * KO * KO * C
-            ad["LBRead"] = KO * KO * C + (N + KD - 1) * (M + KD - 1) * C
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = N * KD * C
+            ad.MAC = M * N * KO * KO * C
+            ad.LBRead = KO * KO * C + (N + KD - 1) * (M + KD - 1) * C
+            ad.LBWrite = M * N
+            ad.RBActivate = N * KD * C
             runtime = (min(N, M) - 1 + KD * KD) * C
         # LLT.NGCONV
         elif _q_pearray["execution"] == TCExe[6]:
@@ -130,38 +124,38 @@ class PEArray:
             K = _layerclass.kernel_size
             CO = _layerclass.in_channel
             CP = CO / _layerclass.group
-            ad["MAC"] = M * N * K * K * CP
-            ad["LBRead"] = K * K * CP + (N + K - 1) * (M + K - 1) * CP
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = N * K * CP
+            ad.MAC = M * N * K * K * CP
+            ad.LBRead = K * K * CP + (N + K - 1) * (M + K - 1) * CP
+            ad.LBWrite = M * N
+            ad.RBActivate = N * K * CP
             runtime = (min(N, M) - 1 + K * K) * CP
         # LLT.GEMM
         elif _q_pearray["execution"] == TCExe[8]:
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
             KDIM = _layerclass.k_dim
-            ad["MAC"] = M * KDIM * N
-            ad["LBRead"] = N * KDIM + M * KDIM
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = N * KDIM
+            ad.MAC = M * KDIM * N
+            ad.LBRead = N * KDIM + M * KDIM
+            ad.LBWrite = M * N
+            ad.RBActivate = N * KDIM
             runtime = 1 + KDIM + M
         # LLT.MADD
         elif _q_pearray["execution"] == TCExe[9]:
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
-            ad["MAC"] = M * N
-            ad["LBRead"] = M * N * 2
-            ad["LBWrite"] = M * N
-            ad["RBActivate"] = 0
+            ad.MAC = M * N
+            ad.LBRead = M * N * 2
+            ad.LBWrite = M * N
+            ad.RBActivate = 0
             runtime = max(M, N)
         # LLT.Layernorm
         elif _q_pearray["execution"] == TCExe[10]:
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
-            ad["MAC"] = M * N * 2
-            ad["LBRead"] = M * N
-            ad["LBWrite"] = N * N
-            ad["RBActivate"] = 0
+            ad.MAC = M * N * 2
+            ad.LBRead = M * N
+            ad.LBWrite = N * N
+            ad.RBActivate = 0
             runtime = max(N, M) + 1
         # NLT.Pooling   # deprecated
         # elif _q_pearray['execution'] == TCExe[11]:
@@ -172,13 +166,13 @@ class PEArray:
 
 
 class TensorCoreNOC:
-    def __init__(self, _pearraynum, _nocbw) -> None:
-        self.fanoutbus = _pearraynum
-        self.nocbw = _nocbw
+    def __init__(self) -> None:
+        self.fanoutbus = MoraxConfig.PEArrayNum
+        self.nocbw = MoraxConfig.NOCBwGbps
         self.NOCCastList = []
         # self.TimeFilm = TimeFilm()
 
-    def run_query(self, _q_noc, _issue_t: int = 0, _bulksize: float = 0):
+    def run_query(self, _q_noc, _issue_t: int = 0, _bulksize: int = 0):
         # _q_noc: tasksizelist: list of tuple(int, int) tasklabel: str
         # _bulksize is the total databulk to issue of this query
         tslist = []
@@ -198,25 +192,18 @@ class TensorCoreNOC:
         return submit_t
 
 
-# Morax DONOT ALLOW asynchronous execution within one TC
+# NOTE Morax DONOT ALLOW asynchronous execution within one TC
 
 
 class TensorCore:
-    def __init__(
-        self,
-        _tcid: int,
-        _pearraynum: int,
-        _pearraysize: int,
-        _pearraybufsize: int,
-        _nocbw: int,
-    ) -> None:
+    def __init__(self, _tcid: int) -> None:
         self.tcid = _tcid
-        self.pearraynum = _pearraynum
+        self.pearraynum = MoraxConfig.PEArrayNum
         self.PEArrayObjList = []
         for peid in range(self.pearraynum):
-            pearray = PEArray(peid, _pearraysize, _pearraybufsize)
+            pearray = PEArray(peid)
             self.PEArrayObjList.append(copy.deepcopy(pearray))
-        self.NOC = TensorCoreNOC(self.pearraynum, _nocbw)
+        self.NOC = TensorCoreNOC()
         self.TimeFilm = TimeFilm()
 
     def run_query(
@@ -240,7 +227,9 @@ class TensorCore:
             sq_pearray["subtasksize"] = query_tc.tasksizelist[peid]
             sq_pearray["dfmod"] = query_tc.dfmod
             sq_pearray["execution"] = query_tc.execution
-            sq_pearray["subtasklabel"] = query_tc.tasklabel + "_pe" + str(peid)
+            sq_pearray["subtasklabel"] = (
+                query_tc.tasklabel + "_tc" + str(self.tcid) + "_pe" + str(peid)
+            )
             sq_pearraylist.append(copy.deepcopy(sq_pearray))
         # 2. justify invoke time
         q_noc = {"tasklabel": query_tc.tasklabel, "tasksizelist": query_tc.tasksizelist}

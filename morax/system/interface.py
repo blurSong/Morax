@@ -13,6 +13,9 @@ from enum import Enum
 from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 
 
+BitPrecision = 16
+
+
 class ClusterComponent(Enum):
     WeightBuffer = 0
     FeatureBuffer = 1
@@ -30,6 +33,8 @@ class SystemOperator(Enum):
     Truncation = 102
     HWNC2CHWN = 103
     CHWN2HWNC = 104
+    VMAX = 105
+    Vnorm = 106
 
 
 CC = ClusterComponent
@@ -55,19 +60,24 @@ MoraxExecutionDict = {
         LLT.CONV,
         LLT.TRCONV,
         LLT.NGCONV,
+        LLT.VMM,
         LLT.GEMM,
         SO.LookUp,
     ],
     CC.SMU: [SO.Transpose, SO.Truncation, SO.HWNC2CHWN, SO.CHWN2HWNC],
     CC.VPU: [
-        LLT.Linear,
-        LLT.Residual,
+        # LLT.Linear,
+        # LLT.Residual,
         LLT.VDP,
         LLT.VADD,
         LLT.VMUL,
         LLT.VMM,
+        LLT.Batchnorm,
+        LLT.Layernorm,
         NLT.Pooling,
-        NLT.Softmax1D,
-        NLT.Softmax2D,
+        SO.VMAX,
+        SO.Vnorm,
+        # NLT.Softmax1D,
+        # NLT.Softmax2D,
     ],
 }

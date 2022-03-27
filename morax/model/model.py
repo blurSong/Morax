@@ -3,7 +3,7 @@ import re
 import sys
 import os
 from enum import Enum
-from typing import Dict, List
+from collections import UserDict, UserList
 from pyrsistent import T
 import morax.model.layer as Lyr
 
@@ -16,7 +16,7 @@ class ModelType(Enum):
     MHATTENTION = 4
 
 
-class ModelDAG(Dict):
+class ModelDAG(UserDict):
     def __init__(self, _modelname, _modeltype) -> None:
         super().__init__()
         self.modelname = _modelname
@@ -38,7 +38,7 @@ class ModelDAG(Dict):
         self.add_layer(-1, False)
 
 
-class ModelList(List):
+class ModelList(UserList):
     def __init__(self, _modelname, _modeltype) -> None:
         super().__init_()
         self.modelname = _modelname

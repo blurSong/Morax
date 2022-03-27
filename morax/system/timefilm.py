@@ -3,7 +3,6 @@
 # Author: Tao Song.
 # Last modification: 0316
 
-import sys
 from typing import Container
 import re
 import numpy as np
@@ -13,8 +12,9 @@ import openpyxl
 import math
 import copy
 from enum import Enum
-from typing import List
+from collections import UserList
 
+t
 int64 = np.int64
 
 
@@ -37,7 +37,7 @@ class TimeStamp:
         self.span = _span
 
 
-class TimeFilm(List):
+class TimeFilm(UserList):
     def __init__(self) -> None:
         super().__init__()
 

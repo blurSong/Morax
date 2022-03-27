@@ -343,6 +343,8 @@ class Softmax2D(NonlinearLayer):  # MLP
         )
         self.row_dim = self.layer_csvline[mxLCD_GEMM["M"]]
         self.col_dim = self.layer_csvline[mxLCD_GEMM["N"]]
-        self.is_activated = False if self.layer_csvline[mxLCD_GEMM["RP"]] == 0 else True
+        self.is_activated = (
+            False if self.layer_csvline[mxLCD_GEMM["ACT"]] == 0 else True
+        )
         self.input_indecies_tuple = (self.layer_csvline[mxLCD_GEMM["IDX1"]], 0)
 
