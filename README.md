@@ -53,10 +53,10 @@ if model has BN/LN layer, use **mode_norm.csv**
 | Softmax1d [-2]          | IC  |     |     |     |     | TYP | RP  | IDX | 0                                              | IC = OC            |
 
 #### MLP/RNN/Attention Model  
-1. **[MNK]**    
-    **GEMM MK × KN**  
-    **VecVec M**
-    **VecMat or MatMat M * N** (M=Vinput N=Voutput)   
+1. **[MNK]**     
+    **GEMM MK × KN**    
+    **VecVec M**   
+    **VecMat or MatMat M * N** (M=Vinput N=Voutput)     
 
 2. **[ACT]**
     1: this layer has activation
