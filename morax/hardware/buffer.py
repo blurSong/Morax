@@ -90,9 +90,7 @@ class ScratchPadBuffer:
                 return -1
                 # need inter cluster read or dram read
         runtime = (
-            _q_buffer.databulkclass.sizebyte
-            * MoraxConfig.PrecisionBits
-            / self.BandwidthGbps
+            _q_buffer.databulkclass.sizebyte * 8 / self.BandwidthGbps
             if self.BandwidthGbps != 0
             else 0
         )

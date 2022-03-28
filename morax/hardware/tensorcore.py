@@ -11,7 +11,7 @@ from morax.system.interface import MoraxExecutionDict, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict, UserList
 from morax.system.query import QueryExcuteOnTC
-from morax.system.config import MoraxConfig, HWParam
+from morax.system.config import MoraxConfig
 
 TCExe = MoraxExecutionDict[ClusterComponent.TensorCore]
 

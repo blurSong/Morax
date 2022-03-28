@@ -1,7 +1,7 @@
-# Cluster class of Morax
+# DMA class of Morax
 # Morax means the mixing of CMOS and RRAM
 # Author: Tao Song.
-# Last modification: 0327
+# Last modification: 0328
 
 import subprocess as SP
 import multiprocessing as MP
@@ -38,9 +38,7 @@ class RingBus:
         )
         busts = TimeStamp(TO.ClusterTransfer, _issue_t, _q_clutrans.databulkclass.label)
         runtime = (
-            _q_clutrans.databulkclass.sizebyte
-            * MoraxConfig.PrecisionBits
-            / MoraxConfig.ClusterBusBandwidthGbps
+            _q_clutrans.databulkclass.sizebyte * 8 / MoraxConfig.ClusterBusBandwidthGbps
         )
         busts.update_span(runtime)
         self.TimeFilm.append_stamp(busts)
@@ -56,11 +54,7 @@ class DMA:
     def run_query(self, _q_dma: QueryDMA, _issue_t) -> int:
         dmaad = DRAMReadActionDict(_q_dma.databulkclass, _q_dma.toCluster)
         dmats = TimeStamp(TO.ReadDRAM, _issue_t, _q_dma.databulkclass.label)
-        runtime = (
-            _q_dma.databulkclass.sizebyte
-            * MoraxConfig.PrecisionBits
-            / MoraxConfig.OffChipBandwidthGbps
-        )
+        runtime = _q_dma.databulkclass.sizebyte * 8 / MoraxConfig.OffChipBandwidthGbps
         dmats.update_span(runtime)
         self.TimeFilm.append_stamp(dmats)
         self.DRAMReadList.append(dmaad)

@@ -31,6 +31,7 @@ class MoraxConfig:
 
     # [SMU]
     SMURegFileSizeKB = 1
+
     # [System]
     PrecisionBits = 16
     FracBits = 5
