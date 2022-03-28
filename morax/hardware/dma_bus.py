@@ -3,11 +3,9 @@
 # Author: Tao Song.
 # Last modification: 0327
 
-import numpy as np
 import subprocess as SP
 import multiprocessing as MP
 import copy
-import re
 from morax.system.interface import TO, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from morax.system.config import MoraxConfig, HWParam
