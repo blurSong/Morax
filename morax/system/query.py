@@ -146,17 +146,16 @@ class QueryExcuteOnSMU(QueryExcute):
         return dfsafe and executionsafe and tasksafe
 
 
-class QueryClusterTransfer:
-    def __init__(self, _bulklabel, _bulksize, _Cluster):
-        self.bulksize = _bulksize
-        self.bulklabel = _bulklabel
-        self.Cluster = _Cluster
+class QueryRingBus:
+    def __init__(self, _databulkclass: DataBulk, _fromCluster, _toCluster):
+        self.databulkclass = _databulkclass
+        self.fromCluster = _fromCluster
+        self.toCluster = _toCluster
 
 
-class QueryReadDRAM:
-    def __init__(self, _bulklabel, _bulksize, _toCluster):
-        self.bulksize = _bulksize
-        self.bulklabel = _bulklabel
+class QueryDMA:
+    def __init__(self, _databulkclass: DataBulk, _toCluster):
+        self.databulkclass = _databulkclass
         self.toCluster = _toCluster
 
 

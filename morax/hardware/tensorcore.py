@@ -188,7 +188,7 @@ class TensorCoreNOC:
             ncl.append(bs)
         self.NOCCastList.append(ncl)
         # add NOC Cast time to update submit_t
-        submit_t = _issue_t + max(ncl) / self.nocbw
+        submit_t = _issue_t + max(ncl) * MoraxConfig.PrecisionBits / self.nocbw
         return submit_t
 
 

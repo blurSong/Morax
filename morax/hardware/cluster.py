@@ -46,7 +46,7 @@ class MoraxCluster:
         if isinstance(this_query, Q.QueryBuffer):
             bulklabel = this_query.databulkclass.label
             if re.search("WET", bulklabel):
-                et_t = self.WeightBuffer.run_query(this_query, _issue_t)
+                ret_t = self.WeightBuffer.run_query(this_query, _issue_t)
             elif re.search("FTR", bulklabel):
                 ret_t = self.FeatureBuffer.run_query(this_query, _issue_t)
             else:

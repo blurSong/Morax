@@ -11,7 +11,7 @@ from morax.system.interface import BO, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict
 from morax.system.config import MoraxConfig, HWParam
-from morax.system.query import QueryBuffer, DataBulk
+from morax.system.query import QueryBuffer
 
 """
 # [bulk]
@@ -90,7 +90,9 @@ class ScratchPadBuffer:
                 return -1
                 # need inter cluster read or dram read
         runtime = (
-            _q_buffer.databulkclass.sizebyte / self.BandwidthGbps
+            _q_buffer.databulkclass.sizebyte
+            * MoraxConfig.PrecisionBits
+            / self.BandwidthGbps
             if self.BandwidthGbps != 0
             else 0
         )

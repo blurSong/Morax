@@ -38,13 +38,19 @@ class SystemOperator(Enum):
 
 
 class BufferOperator(Enum):
-    Write = 0
-    Read = 1
+    Write = 200
+    Read = 201
+
+
+class TransmissionOperator(Enum):
+    ReadDRAM = 300
+    ClusterTransfer = 301
 
 
 CC = ClusterComponent
 SO = SystemOperator
 BO = BufferOperator
+TO = TransmissionOperator
 
 
 MoraxExecutionDict = {

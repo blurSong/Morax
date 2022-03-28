@@ -31,7 +31,7 @@ class SMU:
         self.TimeFilm = TimeFilm()
         self.SMUActionList = []
         self.regfile = (
-            MoraxConfig.SMURegFileSizekB * 1024 * 8 / MoraxConfig.PrecisionBits
+            MoraxConfig.SMURegFileSizeKB * 1024 * 8 / MoraxConfig.PrecisionBits
         )
         self.Busy = False
 

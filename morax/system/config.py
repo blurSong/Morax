@@ -2,11 +2,12 @@ class MoraxConfig:
     # [Chip]
     OffChipBandwidthGbps = 256
     ClusterNum = 16
+    ClusterBusBandwidthGbps = 768
 
     # [Cluster]
     WeightBufferSizeKB = 1024
     FeatureBufferSizeKB = 256
-    FeatureBufferBandwidthGbps = 64
+    FeatureBufferBandwidthGbps = 1024
     TCNum = 8
     nvTCNum = 8
 
@@ -29,7 +30,7 @@ class MoraxConfig:
     FIFODeepth = 8
 
     # [SMU]
-    SMURegFileSizekB = 1
+    SMURegFileSizeKB = 1
     # [System]
     PrecisionBits = 16
     FracBits = 5
