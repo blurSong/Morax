@@ -37,9 +37,16 @@ class RingBus:
             _q_clutrans.databulkclass, _q_clutrans.fromCluster, _q_clutrans.toCluster
         )
         busts = TimeStamp(TO.ClusterTransfer, _issue_t, _q_clutrans.databulkclass.label)
-        runtime = (
+        hoptime = (
             _q_clutrans.databulkclass.sizebyte * 8 / MoraxConfig.ClusterBusBandwidthGbps
         )
+        toc = _q_clutrans.toCluster
+        fromc = _q_clutrans.fromCluster
+        if toc > fromc:
+            hops = min(toc - fromc, fromc + MoraxConfig.ClusterNum - toc)
+        else:
+            hops = min(fromc - toc, toc + MoraxConfig.ClusterNum - fromc)
+        runtime = hoptime * hops
         busts.update_span(runtime)
         self.TimeFilm.append_stamp(busts)
         self.ClusterTransferList.append(busatd)

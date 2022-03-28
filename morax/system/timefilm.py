@@ -13,8 +13,8 @@ import math
 import copy
 from enum import Enum
 from collections import UserList
+from interface import SystemVirtualOperator as SVO
 
-t
 int64 = np.int64
 
 
@@ -26,7 +26,7 @@ class TimeStamp:
         self.span = 0
         self.label = _label
         self.issue_t = _issue_t
-        self.submit_t = _issue_t - 1
+        self.submit_t = _issue_t
 
     def update_submit_t(self, _submit_t):
         self.submit_t = _submit_t
@@ -40,10 +40,11 @@ class TimeStamp:
 class TimeFilm(UserList):
     def __init__(self) -> None:
         super().__init__()
+        self.append(TimeStamp(SVO.SystemStart, 0, "SystemStart"))
 
     def append_stamp(self, _stamp: TimeStamp):
         if self[-1].submit_t >= _stamp.issue_t:
             _stamp.issue_t = self[-1].submit_t + 1
             _stamp.submit_t = _stamp.issue_t + _stamp.span
-        thisstamp = copy.deepcopy(_stamp)
-        self.append(thisstamp)
+        this_stamp = copy.deepcopy(_stamp)
+        self.append(this_stamp)

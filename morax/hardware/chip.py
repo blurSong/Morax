@@ -31,5 +31,5 @@ class MoraxChip:
             self.ClusterList.append(copy.deepcopy(clst))
         self.MoraxTileFilm = TimeFilm()
 
-    def invoke_morax(self, _q_layer: Q.LayerQuery):
+    def invoke_morax(self, _q_layer: Q.LayerQuery, _issue_t: int):
         

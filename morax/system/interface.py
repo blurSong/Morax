@@ -47,6 +47,11 @@ class TransmissionOperator(Enum):
     ClusterTransfer = 301
 
 
+class SystemVirtualOperator(Enum):
+    SystemStart = 400
+    SystemStop = 401
+
+
 CC = ClusterComponent
 SO = SystemOperator
 BO = BufferOperator
