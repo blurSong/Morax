@@ -4,7 +4,7 @@
 
 ##### csv name    
 **model.csv**   
-if model has BN/LN layer, use **mode_norm.csv**
+if model has BN/LN layer, use **model_norm.csv**
 
 #### CONV Model                            
 1. How to fill **[IC OC FS KS STR]**  
