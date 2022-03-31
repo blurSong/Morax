@@ -9,7 +9,7 @@ class MoraxConfig:
     FeatureBufferSizeKB = 256
     FeatureBufferBandwidthGbps = 1024
     TCNum = 8
-    nvTCNum = 8
+    nvTCNum = 32
 
     # [TensorCore]
     PEArrayNum = 8

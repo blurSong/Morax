@@ -13,9 +13,6 @@ from enum import Enum
 from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 
 
-BitPrecision = 16
-
-
 class ClusterComponent(Enum):
     WeightBuffer = 0
     FeatureBuffer = 1

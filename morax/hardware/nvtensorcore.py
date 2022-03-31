@@ -86,11 +86,13 @@ class RRAMSlice:
         self.RRAMSliceMVMAction = RRAMSliceMVMActionDict()
         self.RRAMSliceLUTActionList = []
         self.TimeFilm = TimeFilm()  # MVM once BUT LUT many times
+        self.layerinfo = (-1, (0, 0))
         self.mapped = False
 
-    def map_slice(self, _layerids: tuple(int, int), _islut, _mvmrow, _mvmcol):
+    # info: (layerid, mappingmap(rowid, colid))
+    def map_slice(self, _layerinfo: tuple(int, (int, int)), _islut, _mvmrow, _mvmcol):
         self.mapped = True
-        self.layerids = _layerids
+        self.layerinfo = _layerinfo
         self.EightXbar["mvmrow"] = _mvmrow
         self.EightXbar["mvmcol"] = _mvmcol
         self.EightXbar["lutrow"] = MoraxConfig.RRAMLUTRows if _islut else 0
@@ -169,12 +171,12 @@ class nvTensorCore:
         self.TimeFilm = TimeFilm()
 
     def map_slices(
-        self, _sliceid_list, _layeridtuple_list, _islut_list, _mvmsizetuple_list
+        self, _sliceid_list, _layerinfotuple_list, _islut_list, _mvmsizetuple_list
     ):
         assert len(_sliceid_list) <= self.slicenum
         for sid in _sliceid_list:
             self.RRAMSliceObjList[sid].map_slice(
-                _layeridtuple_list[sid],
+                _layerinfotuple_list[sid],
                 _islut_list[sid],
                 _mvmsizetuple_list[sid][0],
                 _mvmsizetuple_list[sid][1],

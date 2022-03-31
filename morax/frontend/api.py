@@ -35,7 +35,11 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
     model_dag = Model.ModelDAG(_model, _modeltype)
     model_list = Model.ModelList(_model, _modeltype)
     model_dag.add_vlayer()
-    model_list.add_vlayer()
+    # model_list.add_vlayer()
+
+    if _modeltype == Model.ModelType.MHATTENTION:
+        outofrange_idx = _layernum
+        concatlist = []
 
     for idx in range(_layernum):
         line = _model_nd[idx, ...]
@@ -154,14 +158,22 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
             )
             model_list.add_layer(copy.deepcopy(linearlayer))
             model_dag.add_layer(idx, True)
-            outofrangeidx = _layernum + 42
+            #
+            # NOW add other heads to model_dag using outofrangeidx
             attentionlayer = -linearlayer.input_indecies_tuple[0]
-            for hd in range(linearlayer.head):  # 0 ~ head-1
+            for hd in range(linearlayer.head - 1):  # 0 ~ head-1
                 for attentionidx in range(attentionlayer):
                     model_dag.add_layer(
-                        outofrangeidx + attentionidx + hd * attentionlayer,
+                        outofrange_idx + attentionidx + hd * attentionlayer,
                         True,  # TODO: Softmax False
                     )
+            concattuple = (
+                idx - attentionlayer,
+                outofrange_idx,
+                linearlayer.head,
+                attentionlayer,
+            )
+            concatlist.append(concattuple)
 
         # add edge
         if layertype != "CONCAT":
@@ -185,27 +197,45 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
             #  add first head last layer edge to concat layer
             model_dag.add_edge(idx - 1, idx)
             # add left heads
-            outofrange_idx = _layernum + 42
             head = line[mxLCD_GEMM["M"]]
             attentionlayer = -line[mxLCD_GEMM["IDX1"]]
             head1begin_idx = idx - attentionlayer
-            attentioninput_idx = _model_nd[head1begin_idx, mxLCD_GEMM["IDX1"]]
+            attentioninput_eidx = _model_nd[head1begin_idx, mxLCD_GEMM["IDX1"]]
             for hd in range(head - 1):
                 headxbegin_idx = outofrange_idx + attentionlayer * hd
-                if attentioninput_idx == 0:
+                if attentioninput_eidx == 0:
                     model_dag.add_edge(-1, headxbegin_idx)
                 else:
                     model_dag.add_edge(
-                        attentioninput_idx + head1begin_idx, headxbegin_idx
+                        attentioninput_eidx + head1begin_idx, headxbegin_idx
                     )
                 for atl in range(attentionlayer):
                     this_idx = headxbegin_idx + atl
-                    for _idx in model_dag[head1begin_idx + atl]:
+                    for _idx in model_dag.toVertexDict[head1begin_idx + atl]:
                         that_idx = (
-                            headxbegin_idx + _idx if atl < attentionlayer - 1 else idx
+                            _idx - head1begin_idx + headxbegin_idx
+                            if atl < attentionlayer - 1
+                            else idx
                         )
                         model_dag.add_edge(this_idx, that_idx)
+            outofrange_idx += attentionlayer * (head - 1)
 
     # assert model_dag.layernum == model_list.layernum
     # assert model_dag.layernum == _layernum
-    return model_dag, model_list
+    if _modeltype == Model.ModelType.MHATTENTION:
+        return model_dag, model_list, concatlist
+    else:
+        return model_dag, model_list
+
+
+def get_idx_from_concat(idx, concatlist):
+    # concattuple = (liststartidx, head2beginidx, head, attentionlayer)
+    for tup in concatlist:
+        if idx >= tup[1] and idx < tup[1] + (tup[2] - 1) * tup[3]:
+            idx -= tup[1]
+            while idx > tup[3]:
+                idx -= tup[3]
+            oidx = tup[0] + idx
+        else:
+            continue
+    return oidx

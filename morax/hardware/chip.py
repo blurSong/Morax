@@ -26,8 +26,8 @@ class MoraxChip:
         self.RingBus = dma_bus.RingBus()
         self.ClusterNum = MoraxConfig.ClusterNum
         self.ClusterList = []
-        for cluid in range(self.ClusterNum):
-            clst = cluster.MoraxCluster()
+        for clstid in range(self.ClusterNum):
+            clst = cluster.MoraxCluster(clstid)
             self.ClusterList.append(copy.deepcopy(clst))
         self.MoraxTileFilm = TimeFilm()
 

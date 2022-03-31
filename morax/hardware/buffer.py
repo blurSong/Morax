@@ -18,19 +18,58 @@ from morax.system.query import QueryBuffer
 # indicate the data form of input and weight
 # bulkfrom = (part or whole) feature: BCHW  weight: KCRS  MVM & GEMM: BMKN
 # dataname = W or F
-# bulklabel = modelname_ 'L'+layeridx_                'WET'+ bulkidx_ bulksizeByte_ bulkfrom
-# bulklabel = modelname_ 'L'+layeridx_ 'B'+ batchidx_ 'FTR'+ bulkidx_ bulksizeByte_ bulkfrom
+# bulklabel = modelname_ 'L'+layeridx_ 'WET_' bulksizeByte_ bulkfrom
+# bulklabel = modelname_ 'L'+layeridx_ 'FTR_' bulksizeByte_ bulkfrom
 
-            bulklabel: ResNet18_L17_WET5_2304_CRS   ResNet18_L17_B3_FTR2_4096_HW
+            bulklabel: ResNet18_L17_WET_1024_K5_C50_RS0   ResNet18_L17_FTR_4096_B3_C7_HW3
+#
+    modelname: str
+    layerindex: int
+    datatype: str (WET or FTR)
+    bulksizeByte: int
+    K:           B:
+    C:           C:
+    RS:          HW:
+    bulklabel: str
+
 
 # token: out-degree for F, total read demand for W.
 """
 
 
+def make_bulklabel(mn, li, bs, bsd: dict, datatype: str):
+    assert datatype in ["WET", "FTR"]
+    bulkform = str()
+    for key, val in bsd.item():
+        if isinstance(val, list):
+            bulkform += "_" + key + "_".join(val)
+        else:
+            bulkform += "_" + key + str(val)
+    return mn + "_L" + str(li) + "_" + datatype + "_" + str(bs) + bulkform
+
+
 class DataBulk:
-    def __init__(self, _bulksizebyte, _bulklabel: str, _bulktoken=1) -> None:
-        self.sizebyte = _bulksizebyte * 1024
-        self.label = _bulklabel
+    def __init__(
+        self,
+        _modelname,
+        _layerindex,
+        _datatype,
+        _bulksizebyte,
+        _bulkscratch: dict,
+        _bulktoken=1,
+    ) -> None:
+        self.modelname = _modelname
+        self.layerindex = _layerindex
+        self.datatype = _datatype
+        self.bulksizebyte = _bulksizebyte
+        self.bulkscratch = copy.deepcopy(_bulkscratch)
+        self.bulklabel = make_bulklabel(
+            self.modelname,
+            self.layerindex,
+            self.bulksizebyte,
+            self.bulkscratch,
+            self.datatype,
+        )
         self.token = _bulktoken
 
 
@@ -42,8 +81,8 @@ class BufferIOActionDict:
 
 
 class ScratchPadBuffer:
-    def __init__(self, _sizekb, _bandwidthgbps=0) -> None:
-        self.CapacityByte = _sizekb * 1024
+    def __init__(self, _sizeKB, _bandwidthgbps=0) -> None:
+        self.CapacityByte = _sizeKB * 1024
         self.WaterLineByte = 0
         self.BandwidthGbps = _bandwidthgbps
         self.MemScratchPad = {}
