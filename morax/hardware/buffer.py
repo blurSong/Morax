@@ -44,7 +44,10 @@ def make_bulklabel(mn, li, bs, bsd: dict, datatype: str):
         if isinstance(val, list):
             bulkform += "_" + key + "_".join(val)
         else:
-            bulkform += "_" + key + str(val)
+            if val == 114514:
+                bulkform += "_" + key + "ALL"
+            else:
+                bulkform += "_" + key + str(val)
     return mn + "_L" + str(li) + "_" + datatype + "_" + str(bs) + bulkform
 
 
