@@ -4,6 +4,7 @@
 # Last modification: 0316
 
 
+from lzma import MODE_FAST
 from sqlite3 import DataError
 import queue
 import sys
@@ -11,6 +12,8 @@ import numpy as np
 import copy
 import pandas as pd
 import subprocess as SP
+
+from sympy import Q
 from morax.system.interface import *
 from morax.model.layer import (
     LinearLayerType as LLT,
@@ -253,6 +256,7 @@ ALL = 114514
 def compileRRAM(
     _index, _modelname, _layerclass, _doclotnsl: dict, _chip: MoraxChip, _batch, token
 ):
+    # NOTE BATCH IS ALWAYS THE LAST
     # dict of clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]
     SubQueryList = []
     layertype = _layerclass.layer_type
@@ -280,7 +284,7 @@ def compileRRAM(
                         if tup[0] not in bulkinfo:
                             bulkinfo.append(tup[0])
                     # make query
-                    datatype = "FTR"
+                    datatype = "FTR" if layertype == LLT.Linear else "VEC"
                     bulkscratch = {}
                     taskindex += 1
                     bulkscratch["B"] = bat
@@ -288,8 +292,8 @@ def compileRRAM(
                         bulkscratch["HW"] = ALL
                         rowpart = "C"
                     else:
-                        bulkscratch["M"] = ALL
-                        rowpart = "N"
+                        bulkscratch["N"] = ALL
+                        rowpart = "M"
                     bulkscratch[rowpart] = []
                     bs = 0
                     for inf in bulkinfo:
@@ -301,7 +305,9 @@ def compileRRAM(
                     bs = bs * MoraxConfig.PrecisionBits / 8
                     bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
-                    tasklabel = make_tasklabel(_modelname, _index, taskindex, "Linear")
+                    tasklabel = make_tasklabel(
+                        _modelname, _index, taskindex, mxLTD[layertype]
+                    )
                     qe = QueryExcuteOnNVTC(
                         _layerclass,
                         tasklabel,
@@ -335,7 +341,7 @@ def compileRRAM(
                 bulk = DataBulk(
                     _modelname,
                     _index,
-                    "FTR",
+                    "VEC",
                     _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
                     {"B": bat, "M": ALL, "N": ALL},
                     token,
@@ -369,7 +375,7 @@ def compileRRAM(
                     bulkscratch = {}
                     bulkscratch["B"] = bat
                     bulkscratch["HW"] = col_iter + row_iter * omapsize
-                    bulkscratch["C"] = 114514
+                    bulkscratch["C"] = ALL
                     bs = (
                         _layerclass.kernel_size
                         * _layerclass.in_channel
@@ -419,7 +425,7 @@ def compileRRAM(
                         _index,
                         "FTR",
                         _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": 114514},
+                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": ALL},
                         token,
                     )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
@@ -464,7 +470,7 @@ def compileRRAM(
                         bulkscratch["HW"] = (col_iter / _layerclass.stride - 1) + (
                             row_iter / _layerclass.stride - 1
                         ) * _layerclass.feature_size
-                        bulkscratch["C"] = 114514
+                        bulkscratch["C"] = ALL
                         bs = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
                         qr = QueryBuffer(
@@ -508,7 +514,7 @@ def compileRRAM(
                         _index,
                         "FTR",
                         _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": 114514},
+                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": ALL},
                         token,
                     )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
@@ -647,7 +653,7 @@ def compileRRAM(
                             if tup[0] not in bulkinfo:
                                 bulkinfo.append(tup[0])
                         # make query
-                        datatype = "FTR"
+                        datatype = "MAT"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
                         bulkscratch["M"] = vf
@@ -684,7 +690,9 @@ def compileRRAM(
                             )
                             SubQueryList.append(copy.deepcopy(qe))
                     vpu_taskindex += 1
-                    vtasklabel = make_tasklabel(_modelname, _index, 0, "PostProcess")
+                    vtasklabel = make_tasklabel(
+                        _modelname, vpu_taskindex, 0, "PostProcess"
+                    )
                     qv = QueryExcuteOnVPU(
                         _layerclass,
                         vtasklabel,
@@ -696,9 +704,9 @@ def compileRRAM(
                     bulk = DataBulk(
                         _modelname,
                         _index,
-                        "FTR",
+                        "MAT",
                         _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "HW": 114514, "C": 114514},
+                        {"B": bat, "M": line, "N": ALL},
                         token,
                     )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
@@ -708,25 +716,669 @@ def compileRRAM(
 
 
 def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token):
+    # NOTE BATCH IS ALWAYS assigned on one same tc
     SubQueryList = []
     layertype = _layerclass.layer_type
     onetcsize = MoraxConfig.PEArraySize * MoraxConfig.PEArrayNum
-    tcnum = MoraxConfig.TCNum
+    ICtypeLeft = (
+        CC.FeatureBuffer if _layerclass.input_indecies_tuple[0] < 0 else CC.WeightBuffer
+    )
+    ICtypeRight = (
+        CC.FeatureBuffer if _layerclass.input_indecies_tuple[1] < 0 else CC.WeightBuffer
+    )
+    cmos_taskindex = -1
+    vpu_taskindex = -1
+    # go
     if layertype == LLT.Linear or layertype == LLT.VMM:
-        # for: M B N
-        M = math.ceil(_layerclass.row_dim * 1.0 / onetcsize)
+        # for: M N B
+        M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.PEArraySize)
         N = math.ceil(_layerclass.col_dim * 1.0 / onetcsize)
+        N_tail = _layerclass.col_dim % onetcsize
         B = _batch
         for m in range(M):
-            bulkscratch = {}
+            # make left op bulk
+            fbulkscratch = {}
             if layertype == LLT.Linear:
-                bulkscratch['B'] = ALL
-                bulkscratch['HW'] = ALL
-                bulkscratch['C'] = m 
-            bulk = DataBulk(_modelname, _index, 'FTR', B * MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8, {'B':})
-            qrf = QueryBuffer()
-            for b in range(B):
-                for n in range(N):
+                datatype = "FTR"
+                fbulkscratch["B"] = ALL
+                fbulkscratch["HW"] = ALL
+                fbulkscratch["C"] = m
+            else:
+                datatype = "VEC"
+                fbulkscratch["B"] = ALL
+                fbulkscratch["M"] = m
+                fbulkscratch["N"] = ALL
+            fbulk = DataBulk(
+                _modelname,
+                _index,
+                datatype,
+                B * MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8,
+                fbulkscratch,
+            )
+            qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+            SubQueryList.append(copy.deepcopy(qrf))
+            # make right op bulk
+            for n in range(N):
+                wbulkscratch = {}
+                if layertype == LLT.Linear:
+                    datatype = "WET"
+                    wbulkscratch["K"] = m
+                    wbulkscratch["C"] = n
+                    wbulkscratch["RS"] = ALL
+                else:
+                    datatype = "MAT"
+                    wbulkscratch["B"] = ALL
+                    wbulkscratch["M"] = m
+                    wbulkscratch["N"] = n
+                wbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    datatype,
+                    MoraxConfig.PEArraySize * onetcsize * MoraxConfig.PrecisionBits / 8,
+                    wbulkscratch,
+                )
+                qrw = QueryBuffer(wbulk, BO.Read, ICtypeRight, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrw))
+                # make query
+                for b in range(B):
+                    cmos_taskindex += 1
+                    ctasklabel = make_tasklabel(
+                        _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    )
+                    if n == N - 1 and N_tail > 0:
+                        tasksize_list = copy.deepcopy(make_tc_task_list(N_tail))
+                    else:
+                        tasksize_list = [
+                            (MoraxConfig.PEArraySize, MoraxConfig.PEArraySize)
+                        ] * MoraxConfig.PEArrayNum
+                    tcbulksize = MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8
+                    if b == 0:
+                        tcbulksize += (
+                            sum(tasksize_list)
+                            * MoraxConfig.PEArraySize
+                            * MoraxConfig.PrecisionBits
+                            / 8
+                        )
+                    qe = QueryExcuteOnTC(
+                        _layerclass,
+                        ctasklabel,
+                        "Systolic",
+                        layertype,
+                        tasksize_list,
+                        tcbulksize,
+                    )
+                    SubQueryList.append(copy.deepcopy(qe))
+        # make vpu query
+        for b in range(B):
+            vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
+            qv = QueryExcuteOnVPU(
+                _layerclass,
+                vtasklabel,
+                "PostProcess",
+                layertype,
+                (M, _layerclass.col_dim),
+            )
+            SubQueryList.append(copy.deepcopy(qv))
+            if layertype == LLT.Linear:
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                    {"B": b, "HW": ALL, "C": ALL},
+                    token,
+                )
+            else:
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "VEC",
+                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                    {"B": b, "M": ALL, "N": ALL},
+                    token,
+                )
+            qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+            SubQueryList.append(copy.deepcopy(qw))
+        # End for
+
+    if layertype == LLT.CONV:
+        # for: C B
+        H = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        W = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        C = math.ceil(
+            _layerclass.out_channel * 1.0 * H * W / MoraxConfig.PEArrayNum
+        )  # ONETC
+        H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
+        W_tail = H_tail
+        B = _batch
+        for comp in range(C):
+            # spcify task
+            tasksize_listoftup = [] * MoraxConfig.PEArrayNum
+            this_ch = comp * MoraxConfig.PEArrayNum / (H * W)
+            that_ch = (comp + 1) * MoraxConfig.PEArrayNum / (H * W)
+            """
+            tmptid = 0
+            for ch in range(this_ch, that_ch):
+                for ww in range(W):
+                    for hh in range(H):
+                        tmptup = []
+                        if ww == W - 1 and W_tail > 0:
+                            tmptup[0] = W_tail
+                        else:
+                            tmptup[0] = MoraxConfig.PEArraySize
+                        if hh == H - 1 and H_tail > 0:
+                            tmptup[1] = H_tail
+                        else:
+                            tmptup[1] = MoraxConfig.PEArraySize
+                        tasksize_listoftup[tmptid] = tuple(tmptup)
+                        tmptid += 1
+            chnum = that_ch - this_ch
+            """
+            hwidbegin = comp * MoraxConfig.PEArrayNum % (H * W)
+            for tmptid in range(MoraxConfig.PEArrayNum):
+                tmptup = []
+                ww = hwidbegin % W
+                hh = hwidbegin / W
+                if ww == W - 1 and W_tail > 0:
+                    tmptup[1] = W_tail
+                else:
+                    tmptup[1] = MoraxConfig.PEArraySize
+                if hh == H - 1 and H_tail > 0:
+                    tmptup[0] = H_tail
+                else:
+                    tmptup[0] = MoraxConfig.PEArraySize
+                tasksize_listoftup[tmptid] = tuple(tmptup)
+                hwidbegin += 1
+                if (comp * MoraxConfig.PEArrayNum + hwidbegin) / (H * W) > this_ch:
+                    assert this_ch < that_ch
+                    hwidbegin = 0
+                    this_ch += 1
+            chnum = that_ch - this_ch + 1
+            # make weight op bulk
+            wbulkscratch = {}
+            datatype = "WET"
+            wbulkscratch["K"] = ALL
+            wbulkscratch["RS"] = ALL
+            wbulkscratch["C"] = comp
+            wbulksize = (
+                _layerclass.kernel_size ** 2
+                * _layerclass.in_channel
+                * chnum
+                * MoraxConfig.PrecisionBits
+                / 8
+            )
+            wbulk = DataBulk(_modelname, _index, datatype, wbulksize, wbulkscratch,)
+            qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
+            SubQueryList.append(copy.deepcopy(qrw))
+            # make feature op bulk
+            for bat in range(B):
+                fbulkscratch = {}
+                datatype = "FTR"
+                fbulkscratch["B"] = bat
+                fbulkscratch["C"] = ALL
+                fbulkscratch["HW"] = (
+                    comp * MoraxConfig.PEArrayNum % (H * W) / MoraxConfig.PEArrayNum
+                    if H * W >= MoraxConfig.PEArrayNum
+                    else ALL
+                )
+                finsize2d = 0
+                foutsize2d = 0
+                if H * W >= MoraxConfig.PEArrayNum:
+                    for tup in tasksize_listoftup:
+                        finsize2d += (tup[0] + _layerclass.kernel_size - 1) * (
+                            tup[1] + _layerclass.kernel_size - 1
+                        )
+                        foutsize2d += tup[0] * tup[1]
+                else:
+                    finsize2d = _layerclass.feature_size ** 2
+                    foutsize2d = (_layerclass.feature_size / _layerclass.stride) ** 2
+                # finsize2d = (fsize[0] + _layerclass.kernel_size - 1) * (
+                #    fsize[1] + _layerclass.kernel_size - 1)
+                fbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    datatype,
+                    finsize2d * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8,
+                    fbulkscratch,
+                )
+                qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrf))
+                # make query
+                cmos_taskindex += 1
+                ctasklabel = make_tasklabel(
+                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                )
+                tcbulksize = (
+                    finsize2d * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                )
+                if bat == 0:
+                    tcbulksize += wbulksize
+                qe = QueryExcuteOnTC(
+                    _layerclass,
+                    ctasklabel,
+                    "OS",
+                    layertype,
+                    tasksize_listoftup,
+                    tcbulksize,
+                )
+                SubQueryList.append(copy.deepcopy(qe))
+                # make writeback query
+                # foutsize2d = fsize[0] * fsize[1] * MoraxConfig.PrecisionBits / 8
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    foutsize2d * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "HW": fbulkscratch["HW"], "C": comp},
+                    token,
+                )
+                qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qw))
+        # End for
+
+    if layertype == LLT.DWCONV:
+        # for: C B
+        H = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        W = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        C = math.ceil(
+            _layerclass.channel * 1.0 * H * W / MoraxConfig.PEArrayNum
+        )  # ONETC
+        H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
+        W_tail = H_tail
+        B = _batch
+        for comp in range(C):
+            # spcify task
+            tasksize_listoftup = [] * MoraxConfig.PEArrayNum
+            this_ch = comp * MoraxConfig.PEArrayNum / (H * W)
+            that_ch = (comp + 1) * MoraxConfig.PEArrayNum / (H * W)
+            hwidbegin = comp * MoraxConfig.PEArrayNum % (H * W)
+            for tmptid in range(MoraxConfig.PEArrayNum):
+                tmptup = []
+                ww = hwidbegin % W
+                hh = hwidbegin / W
+                if ww == W - 1 and W_tail > 0:
+                    tmptup[1] = W_tail
+                else:
+                    tmptup[1] = MoraxConfig.PEArraySize
+                if hh == H - 1 and H_tail > 0:
+                    tmptup[0] = H_tail
+                else:
+                    tmptup[0] = MoraxConfig.PEArraySize
+                tasksize_listoftup[tmptid] = tuple(tmptup)
+                hwidbegin += 1
+                if (comp * MoraxConfig.PEArrayNum + hwidbegin) / (H * W) > this_ch:
+                    assert this_ch < that_ch
+                    hwidbegin = 0
+                    this_ch += 1
+            chnum = that_ch - this_ch + 1
+            # make weight op bulk
+            wbulkscratch = {}
+            datatype = "WET"
+            wbulkscratch["K"] = ALL
+            wbulkscratch["RS"] = ALL
+            wbulkscratch["C"] = comp
+            wbulksize = (
+                _layerclass.kernel_size ** 2
+                # * _layerclass.in_channel
+                * chnum
+                * MoraxConfig.PrecisionBits
+                / 8
+            )
+            wbulk = DataBulk(_modelname, _index, datatype, wbulksize, wbulkscratch)
+            qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
+            SubQueryList.append(copy.deepcopy(qrw))
+            # make feature op bulk
+            for bat in range(B):
+                fbulkscratch = {}
+                datatype = "FTR"
+                fbulkscratch["B"] = bat
+                fbulkscratch["C"] = comp
+                fbulkscratch["HW"] = (
+                    comp * MoraxConfig.PEArrayNum % (H * W) / MoraxConfig.PEArrayNum
+                    if H * W >= MoraxConfig.PEArrayNum
+                    else ALL
+                )
+                finsize2d = 0
+                foutsize2d = 0
+                if H * W >= MoraxConfig.PEArrayNum:
+                    for tup in tasksize_listoftup:
+                        finsize2d += (tup[0] + _layerclass.kernel_size - 1) * (
+                            tup[1] + _layerclass.kernel_size - 1
+                        )
+                        foutsize2d += tup[0] * tup[1]
+                else:
+                    finsize2d = _layerclass.feature_size ** 2
+                    foutsize2d = (_layerclass.feature_size / _layerclass.stride) ** 2
+
+                fbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    datatype,
+                    finsize2d * chnum * MoraxConfig.PrecisionBits / 8,
+                    fbulkscratch,
+                )
+                qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrf))
+                # make query
+                cmos_taskindex += 1
+                ctasklabel = make_tasklabel(
+                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                )
+                tcbulksize = finsize2d * chnum * MoraxConfig.PrecisionBits / 8
+                if bat == 0:
+                    tcbulksize += wbulksize
+                qe = QueryExcuteOnTC(
+                    _layerclass,
+                    ctasklabel,
+                    "OS",
+                    layertype,
+                    tasksize_listoftup,
+                    tcbulksize,
+                )
+                SubQueryList.append(copy.deepcopy(qe))
+                # make writeback query
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    foutsize2d * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "HW": fbulkscratch["HW"], "C": comp},
+                    token,
+                )
+                qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qw))
+        # End for
+
+    if layertype == LLT.TRCONV:
+        # for: C B
+        ofmapsize = (
+            _layerclass.feature_size - 1
+        ) * _layerclass.stride * 1.0 + _layerclass.kernel_size
+        H = math.ceil(ofmapsize / MoraxConfig.PEArraySize)
+        W = H
+        C = math.ceil(
+            _layerclass.out_channel * 1.0 * H * W / MoraxConfig.PEArrayNum
+        )  # ONETC
+        H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
+        W_tail = H_tail
+        B = _batch
+        for comp in range(C):
+            # spcify task
+            tasksize_listoftup = [] * MoraxConfig.PEArrayNum
+            this_ch = comp * MoraxConfig.PEArrayNum / (H * W)
+            that_ch = (comp + 1) * MoraxConfig.PEArrayNum / (H * W)
+            hwidbegin = comp * MoraxConfig.PEArrayNum % (H * W)
+            for tmptid in range(MoraxConfig.PEArrayNum):
+                tmptup = []
+                ww = hwidbegin % W
+                hh = hwidbegin / W
+                if ww == W - 1 and W_tail > 0:
+                    tmptup[1] = W_tail
+                else:
+                    tmptup[1] = MoraxConfig.PEArraySize
+                if hh == H - 1 and H_tail > 0:
+                    tmptup[0] = H_tail
+                else:
+                    tmptup[0] = MoraxConfig.PEArraySize
+                tasksize_listoftup[tmptid] = tuple(tmptup)
+                hwidbegin += 1
+                if (comp * MoraxConfig.PEArrayNum + hwidbegin) / (H * W) > this_ch:
+                    assert this_ch < that_ch
+                    hwidbegin = 0
+                    this_ch += 1
+            chnum = that_ch - this_ch + 1
+            # make weight op bulk
+            wbulkscratch = {}
+            datatype = "WET"
+            wbulkscratch["K"] = ALL
+            wbulkscratch["RS"] = ALL
+            wbulkscratch["C"] = comp
+            wbulksize = (
+                _layerclass.kernel_size ** 2
+                * _layerclass.in_channel
+                * chnum
+                * MoraxConfig.PrecisionBits
+                / 8
+            )
+            wbulk = DataBulk(_modelname, _index, datatype, wbulksize, wbulkscratch,)
+            qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
+            SubQueryList.append(copy.deepcopy(qrw))
+            # make feature op bulk
+            for bat in range(B):
+                fbulkscratch = {}
+                datatype = "FTR"
+                fbulkscratch["B"] = bat
+                fbulkscratch["C"] = ALL
+                fbulkscratch["HW"] = (
+                    comp * MoraxConfig.PEArrayNum % (H * W) / MoraxConfig.PEArrayNum
+                    if H * W >= MoraxConfig.PEArrayNum
+                    else ALL
+                )
+                finsize2d = 0
+                foutsize2d = 0
+                if H * W >= MoraxConfig.PEArrayNum:
+                    for tup in tasksize_listoftup:
+                        finsize2d += (tup[0] + _layerclass.kernel_size - 1) * (
+                            tup[1] + _layerclass.kernel_size - 1
+                        )
+                        foutsize2d += tup[0] * tup[1]
+                else:
+                    finsize2d = _layerclass.feature_size ** 2
+                    foutsize2d = (_layerclass.feature_size / _layerclass.stride) ** 2
+                # NOTE To avoid misellaneous, Morax use avg infeature num for evaluation
+                finsize2d = finsize2d * _layerclass.feature_size / ofmapsize
+                fbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    datatype,
+                    finsize2d * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8,
+                    fbulkscratch,
+                )
+                qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrf))
+                # make query
+                cmos_taskindex += 1
+                ctasklabel = make_tasklabel(
+                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                )
+                tcbulksize = (
+                    finsize2d * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                )
+                if bat == 0:
+                    tcbulksize += wbulksize
+                qe = QueryExcuteOnTC(
+                    _layerclass,
+                    ctasklabel,
+                    "OS",
+                    layertype,
+                    tasksize_listoftup,
+                    tcbulksize,
+                )
+                SubQueryList.append(copy.deepcopy(qe))
+                # make writeback query
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    foutsize2d * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "HW": fbulkscratch["HW"], "C": comp},
+                    token,
+                )
+                qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qw))
+        # End for
+
+    if layertype == LLT.NGCONV:
+        # for: C B
+        H = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        W = math.ceil(
+            _layerclass.feature_size
+            / _layerclass.stride
+            * 1.0
+            / MoraxConfig.PEArraySize
+        )
+        C = math.ceil(
+            (_layerclass.out_channel / _layerclass.group)
+            * 1.0
+            * H
+            * W
+            / MoraxConfig.PEArrayNum
+        )  # ONETC
+        H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
+        W_tail = H_tail
+        B = _batch
+        G = _layerclass.group
+        for grp in range(G):
+            for comp in range(C):
+                # spcify task
+                tasksize_listoftup = [] * MoraxConfig.PEArrayNum
+                this_ch = comp * MoraxConfig.PEArrayNum / (H * W)
+                that_ch = (comp + 1) * MoraxConfig.PEArrayNum / (H * W)
+                hwidbegin = comp * MoraxConfig.PEArrayNum % (H * W)
+                for tmptid in range(MoraxConfig.PEArrayNum):
+                    tmptup = []
+                    ww = hwidbegin % W
+                    hh = hwidbegin / W
+                    if ww == W - 1 and W_tail > 0:
+                        tmptup[1] = W_tail
+                    else:
+                        tmptup[1] = MoraxConfig.PEArraySize
+                    if hh == H - 1 and H_tail > 0:
+                        tmptup[0] = H_tail
+                    else:
+                        tmptup[0] = MoraxConfig.PEArraySize
+                    tasksize_listoftup[tmptid] = tuple(tmptup)
+                    hwidbegin += 1
+                    if (comp * MoraxConfig.PEArrayNum + hwidbegin) / (H * W) > this_ch:
+                        assert this_ch < that_ch
+                        hwidbegin = 0
+                        this_ch += 1
+                chnum = that_ch - this_ch + 1
+                # make weight op bulk
+                wbulkscratch = {}
+                datatype = "WET"
+                wbulkscratch["K"] = grp
+                wbulkscratch["RS"] = ALL
+                wbulkscratch["C"] = comp
+                wbulksize = (
+                    _layerclass.kernel_size ** 2
+                    * (_layerclass.in_channel / G)
+                    * chnum
+                    * MoraxConfig.PrecisionBits
+                    / 8
+                )
+                wbulk = DataBulk(_modelname, _index, datatype, wbulksize, wbulkscratch,)
+                qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrw))
+                # make feature op bulk
+                for bat in range(B):
+                    fbulkscratch = {}
+                    datatype = "FTR"
+                    fbulkscratch["B"] = bat
+                    fbulkscratch["C"] = grp
+                    fbulkscratch["HW"] = (
+                        comp * MoraxConfig.PEArrayNum % (H * W) / MoraxConfig.PEArrayNum
+                        if H * W >= MoraxConfig.PEArrayNum
+                        else ALL
+                    )
+                    finsize2d = 0
+                    foutsize2d = 0
+                    if H * W >= MoraxConfig.PEArrayNum:
+                        for tup in tasksize_listoftup:
+                            finsize2d += (tup[0] + _layerclass.kernel_size - 1) * (
+                                tup[1] + _layerclass.kernel_size - 1
+                            )
+                            foutsize2d += tup[0] * tup[1]
+                    else:
+                        finsize2d = _layerclass.feature_size ** 2
+                        foutsize2d = (
+                            _layerclass.feature_size / _layerclass.stride
+                        ) ** 2
+                    fbulk = DataBulk(
+                        _modelname,
+                        _index,
+                        datatype,
+                        finsize2d
+                        * (_layerclass.in_channel / G)
+                        * MoraxConfig.PrecisionBits
+                        / 8,
+                        fbulkscratch,
+                    )
+                    qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                    SubQueryList.append(copy.deepcopy(qrf))
+                    # make query
+                    cmos_taskindex += 1
+                    ctasklabel = make_tasklabel(
+                        _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    )
+                    tcbulksize = (
+                        finsize2d
+                        * (_layerclass.in_channel / G)
+                        * MoraxConfig.PrecisionBits
+                        / 8
+                    )
+                    if bat == 0:
+                        tcbulksize += wbulksize
+                    qe = QueryExcuteOnTC(
+                        _layerclass,
+                        ctasklabel,
+                        "OS",
+                        layertype,
+                        tasksize_listoftup,
+                        tcbulksize,
+                    )
+                    SubQueryList.append(copy.deepcopy(qe))
+                    # make writeback query
+                    wbbulk = DataBulk(
+                        _modelname,
+                        _index,
+                        "FTR",
+                        foutsize2d * MoraxConfig.PrecisionBits / 8,
+                        {"B": bat, "HW": fbulkscratch["HW"], "C": grp * C + comp},
+                        token,
+                    )
+                    qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
+                    SubQueryList.append(copy.deepcopy(qw))
+        # End for
+
+
+def make_tc_task_list(_tasklen):
+    ttltup = []
+    for peid in range(MoraxConfig.PEArrayNum):
+        if _tasklen >= MoraxConfig.PEArraySize:
+            _tasklen -= MoraxConfig.PEArraySize
+            ttltup[peid] = (MoraxConfig.PEArraySize, MoraxConfig.PEArraySize)
+        elif _tasklen > 0:
+            _tasklen -= MoraxConfig.PEArraySize
+            ttltup[peid] = (MoraxConfig.PEArraySize, _tasklen)
+        else:
+            ttltup[peid] = (0, 0)
+    return ttltup
 
 
 def generate_queries(

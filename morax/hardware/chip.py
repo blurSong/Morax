@@ -32,4 +32,5 @@ class MoraxChip:
         self.MoraxTileFilm = TimeFilm()
 
     def invoke_morax(self, _q_layer: Q.LayerQuery, _issue_t: int):
-        
+        # RRAM:
+        # CMOS: 最小的调度单位为batch， 同一个TC运行到完成分块的所有batch

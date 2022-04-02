@@ -16,8 +16,8 @@ from morax.system.query import QueryBuffer
 """
 # [bulk]
 # indicate the data form of input and weight
-# bulkfrom = (part or whole) feature: BCHW  weight: KCRS  MVM & GEMM: BMKN
-# dataname = W or F
+# bulkfrom = (part or whole) FTR: BCHW    WET: KCRS    VEC:BMN   MAT: BMN
+# dataname = FTR WET VEC MAT
 # bulklabel = modelname_ 'L'+layeridx_ 'WET_' bulksizeByte_ bulkfrom
 # bulklabel = modelname_ 'L'+layeridx_ 'FTR_' bulksizeByte_ bulkfrom
 
