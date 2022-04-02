@@ -12,7 +12,12 @@ import copy
 import pandas as pd
 import subprocess as SP
 from morax.system.interface import *
-from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT, mxLTD, mxNTD
+from morax.model.layer import (
+    LinearLayerType as LLT,
+    NonlinearLayerType as NLT,
+    mxLTD,
+    mxNTD,
+)
 from morax.system.config import MoraxConfig, HWParam
 from morax.hardware.buffer import DataBulk
 from morax.hardware.chip import MoraxChip
@@ -175,13 +180,19 @@ class QueryDMA:
 
 class LayerQuery:
     def __init__(
-        self, _q_index: int, _batch: int, _layerclass, _assignment, _indegree, _outdegree
+        self,
+        _q_index: int,
+        _batch: int,
+        _layerclass,
+        _assignment,
+        _indegree,
+        _outdegree,
     ) -> None:
         self.q_index = _q_index
         self.batch = _batch
         self.assignment = _assignment
         self.layerclass = copy.deepcopy(_layerclass)
-        self.iodegree = {'in': _indegree, 'out': _outdegree}
+        self.iodegree = {"in": _indegree, "out": _outdegree}
         self.SubQueryList = []
 
         # assignment: listoftuple_clstid_nvtcid_sliceidlist
@@ -200,9 +211,31 @@ class LayerQuery:
         pesize = MoraxConfig.PEArraySize
         if layertype in LLT:
             if self.assignment:  # on NVTC
-                self.SubQueryList.append(copy.deepcopy(compileRRAM(self.q_index, _modelname, self.layerclass, self.assignment, moraxchip, self.batch, self.iodegree['out'])))
+                self.SubQueryList.append(
+                    copy.deepcopy(
+                        compileRRAM(
+                            self.q_index,
+                            _modelname,
+                            self.layerclass,
+                            self.assignment,
+                            moraxchip,
+                            self.batch,
+                            self.iodegree["out"],
+                        )
+                    )
+                )
             else:
-                self.SubQueryList.append(copy.deepcopy(compileCMOS(self.q_index, _modelname, self.layerclass, moraxchip, self.batch)))
+                self.SubQueryList.append(
+                    copy.deepcopy(
+                        compileCMOS(
+                            self.q_index,
+                            _modelname,
+                            self.layerclass,
+                            moraxchip,
+                            self.batch,
+                        )
+                    )
+                )
 
         # Read
         # Excute
@@ -210,19 +243,21 @@ class LayerQuery:
         return
 
 
-
 def make_tasklabel(mn, li, ti, bf: str):
     return mn + "_L" + str(li) + "T" + str(ti) + "_" + bf
+
 
 ALL = 114514
 
 
-def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: MoraxChip, _batch, token):
+def compileRRAM(
+    _index, _modelname, _layerclass, _doclotnsl: dict, _chip: MoraxChip, _batch, token
+):
     # dict of clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]
     SubQueryList = []
     layertype = _layerclass.layer_type
 
-    if mxLTD[layertype] == "Linear" or mxLTD[layertype] == 'VMM':
+    if layertype == LLT.Linear or layertype == LLT.VMM:
         M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         N = math.ceil(_layerclass.col_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         M_tail = _layerclass.row_dim % MoraxConfig.RRAMXbarSize
@@ -234,22 +269,27 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                     (nvtcid, sliceidlist) = nvtctup
                     mapinfo = []
                     for info in sliceidlist:
-                        mapinfo.append(_chip.ClusterList[clstid].nvTensorCoreList[nvtcid].RRAMSliceObjList[info].layerinfo[1])
+                        mapinfo.append(
+                            _chip.ClusterList[clstid]
+                            .nvTensorCoreList[nvtcid]
+                            .RRAMSliceObjList[info]
+                            .layerinfo[1]
+                        )
                     bulkinfo = []
                     for tup in mapinfo:
                         if tup[0] not in bulkinfo:
                             bulkinfo.append(tup[0])
                     # make query
-                    datatype = 'FTR'
+                    datatype = "FTR"
                     bulkscratch = {}
                     taskindex += 1
-                    bulkscratch['B'] = bat
+                    bulkscratch["B"] = bat
                     if mxLTD[layertype] == "Linear":
-                        bulkscratch['HW'] = ALL
-                        rowpart = 'C'
+                        bulkscratch["HW"] = ALL
+                        rowpart = "C"
                     else:
-                        bulkscratch['M'] = ALL
-                        rowpart = 'N'
+                        bulkscratch["M"] = ALL
+                        rowpart = "N"
                     bulkscratch[rowpart] = []
                     bs = 0
                     for inf in bulkinfo:
@@ -262,26 +302,61 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                     bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
                     tasklabel = make_tasklabel(_modelname, _index, taskindex, "Linear")
-                    qe = QueryExcuteOnNVTC(_layerclass, tasklabel, "Xbar", LLT.Linear, nvtcid, clstid, sliceidlist)
+                    qe = QueryExcuteOnNVTC(
+                        _layerclass,
+                        tasklabel,
+                        "Xbar",
+                        LLT.Linear,
+                        nvtcid,
+                        clstid,
+                        sliceidlist,
+                    )
                     SubQueryList.append(copy.deepcopy(qr))
                     SubQueryList.append(copy.deepcopy(qe))
             tasklabel = make_tasklabel(_modelname, _index, 0, "PostProcess")
-            qv = QueryExcuteOnVPU(_layerclass, tasklabel, 'PostProcess', LLT.Linear, (M, _layerclass.col_dim))
+            qv = QueryExcuteOnVPU(
+                _layerclass,
+                tasklabel,
+                "PostProcess",
+                LLT.Linear,
+                (M, _layerclass.col_dim),
+            )
             SubQueryList.append(copy.deepcopy(qv))
             if mxLTD[layertype] == "Linear":
-                bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.col_dim * MoraxConfig.PrecisionBits / 8, \
-                                {'B': bat, 'HW': ALL, 'C': ALL}, token)
+                bulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "HW": ALL, "C": ALL},
+                    token,
+                )
             else:
-                bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.col_dim * MoraxConfig.PrecisionBits / 8, \
-                                {'B': bat, 'M': ALL, 'N': ALL}, token)
+                bulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "FTR",
+                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "M": ALL, "N": ALL},
+                    token,
+                )
             qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
             SubQueryList.append(copy.deepcopy(qw))
         # End for
 
-    if mxLTD[layertype] == "CONV":
-        M = math.ceil(_layerclass.in_channel * _layerclass.kernel_size ** 2 * 1.0 / MoraxConfig.RRAMXbarSize)
+    if layertype == LLT.CONV:
+        M = math.ceil(
+            _layerclass.in_channel
+            * _layerclass.kernel_size ** 2
+            * 1.0
+            / MoraxConfig.RRAMXbarSize
+        )
         N = math.ceil(_layerclass.out_channel * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = _layerclass.in_channel * _layerclass.kernel_size ** 2 % MoraxConfig.RRAMXbarSize
+        M_tail = (
+            _layerclass.in_channel
+            * _layerclass.kernel_size ** 2
+            % MoraxConfig.RRAMXbarSize
+        )
         N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
         rram_taskindex = -1
         vpu_taskindex = -1
@@ -292,11 +367,18 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                     # make simple bulk
                     datatype = "FTR"
                     bulkscratch = {}
-                    bulkscratch['B'] = bat
-                    bulkscratch['HW'] = col_iter + row_iter * omapsize
-                    bulkscratch['C'] = 114514
-                    bs = _layerclass.kernel_size * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
-                    bs *= _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
+                    bulkscratch["B"] = bat
+                    bulkscratch["HW"] = col_iter + row_iter * omapsize
+                    bulkscratch["C"] = 114514
+                    bs = (
+                        _layerclass.kernel_size
+                        * _layerclass.in_channel
+                        * MoraxConfig.PrecisionBits
+                        / 8
+                    )
+                    bs *= (
+                        _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
+                    )
                     bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
                     SubQueryList.append(copy.deepcopy(qr))
@@ -306,45 +388,88 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                         for nvtctup in nvtclist:
                             (nvtcid, sliceidlist) = nvtctup
                             rram_taskindex += 1
-                            rtasklabel = make_tasklabel(_modelname, _index, rram_taskindex, "CONV")
-                            qe = QueryExcuteOnNVTC(_layerclass, rtasklabel, "Xbar", LLT.CONV, nvtcid, clstid, sliceidlist)
+                            rtasklabel = make_tasklabel(
+                                _modelname, _index, rram_taskindex, "CONV"
+                            )
+                            qe = QueryExcuteOnNVTC(
+                                _layerclass,
+                                rtasklabel,
+                                "Xbar",
+                                LLT.CONV,
+                                nvtcid,
+                                clstid,
+                                sliceidlist,
+                            )
                             SubQueryList.append(copy.deepcopy(qe))
                     vpu_taskindex += 1
-                    vtasklabel = make_tasklabel(_modelname, _index, vpu_taskindex, "PostProcess")
-                    qv = QueryExcuteOnVPU(_layerclass, vtasklabel, 'PostProcess', LLT.CONV, (M, _layerclass.out_channel))
+                    vtasklabel = make_tasklabel(
+                        _modelname, _index, vpu_taskindex, "PostProcess"
+                    )
+                    qv = QueryExcuteOnVPU(
+                        _layerclass,
+                        vtasklabel,
+                        "PostProcess",
+                        LLT.CONV,
+                        (M, _layerclass.out_channel),
+                    )
                     SubQueryList.append(copy.deepcopy(qv))
                     # make writeback bulk
-                    bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.out_channel * MoraxConfig.PrecisionBits / 8, \
-                                    {'B': bat, 'HW': col_iter + row_iter * omapsize, 'C': 114514}, token)
+                    bulk = DataBulk(
+                        _modelname,
+                        _index,
+                        "FTR",
+                        _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
+                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": 114514},
+                        token,
+                    )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
 
-    if mxLTD[layertype] == "TRCONV":
-        M = math.ceil(_layerclass.in_channel * _layerclass.kernel_size ** 2 * 1.0 / MoraxConfig.RRAMXbarSize)
+    if layertype == LLT.TRCONV:
+        M = math.ceil(
+            _layerclass.in_channel
+            * _layerclass.kernel_size ** 2
+            * 1.0
+            / MoraxConfig.RRAMXbarSize
+        )
         N = math.ceil(_layerclass.out_channel * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = _layerclass.in_channel * _layerclass.kernel_size ** 2 % MoraxConfig.RRAMXbarSize
+        M_tail = (
+            _layerclass.in_channel
+            * _layerclass.kernel_size ** 2
+            % MoraxConfig.RRAMXbarSize
+        )
         N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
         rram_taskindex = -1
         vpu_taskindex = -1
         for bat in range(_batch):
-            omapsize = (_layerclass.feature_size - 1) * _layerclass.stride + _layerclass.kernel_size
+            omapsize = (
+                _layerclass.feature_size - 1
+            ) * _layerclass.stride + _layerclass.kernel_size
             for row_iter in range(omapsize):
                 for col_iter in range(omapsize):
                     if (
-                        ((row_iter + _layerclass.kernel_size - 1) - (_layerclass.kernel_size - 1)) % _layerclass.stride == 0
-                        and
-                        col_iter % _layerclass.stride == 0
-                        ):
+                        (
+                            (row_iter + _layerclass.kernel_size - 1)
+                            - (_layerclass.kernel_size - 1)
+                        )
+                        % _layerclass.stride
+                        == 0
+                        and col_iter % _layerclass.stride == 0
+                    ):
                         # make simple bulk
                         datatype = "FTR"
                         bulkscratch = {}
-                        bulkscratch['B'] = bat
-                        bulkscratch['HW'] = (col_iter / _layerclass.stride - 1) + (row_iter / _layerclass.stride - 1) * _layerclass.feature_size
-                        bulkscratch['C'] = 114514
+                        bulkscratch["B"] = bat
+                        bulkscratch["HW"] = (col_iter / _layerclass.stride - 1) + (
+                            row_iter / _layerclass.stride - 1
+                        ) * _layerclass.feature_size
+                        bulkscratch["C"] = 114514
                         bs = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
-                        qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
+                        qr = QueryBuffer(
+                            bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
+                        )
                         SubQueryList.append(copy.deepcopy(qr))
                     # make subexe query
                     # dict of clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]
@@ -352,28 +477,67 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                         for nvtctup in nvtclist:
                             (nvtcid, sliceidlist) = nvtctup
                             rram_taskindex += 1
-                            rtasklabel = make_tasklabel(_modelname, _index, rram_taskindex, "TRCONV")
-                            qe = QueryExcuteOnNVTC(_layerclass, rtasklabel, "Xbar", LLT.CONV, nvtcid, clstid, sliceidlist)
+                            rtasklabel = make_tasklabel(
+                                _modelname, _index, rram_taskindex, "TRCONV"
+                            )
+                            qe = QueryExcuteOnNVTC(
+                                _layerclass,
+                                rtasklabel,
+                                "Xbar",
+                                LLT.CONV,
+                                nvtcid,
+                                clstid,
+                                sliceidlist,
+                            )
                             SubQueryList.append(copy.deepcopy(qe))
                     vpu_taskindex += 1
-                    vtasklabel = make_tasklabel(_modelname, _index, vpu_taskindex, "PostProcess")
-                    qv = QueryExcuteOnVPU(_layerclass, vtasklabel, 'PostProcess', LLT.TRCONV, (M, _layerclass.out_channel))
+                    vtasklabel = make_tasklabel(
+                        _modelname, _index, vpu_taskindex, "PostProcess"
+                    )
+                    qv = QueryExcuteOnVPU(
+                        _layerclass,
+                        vtasklabel,
+                        "PostProcess",
+                        LLT.TRCONV,
+                        (M, _layerclass.out_channel),
+                    )
                     SubQueryList.append(copy.deepcopy(qv))
                     # make writeback bulk
-                    bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.out_channel * MoraxConfig.PrecisionBits / 8, \
-                                    {'B': bat, 'HW': col_iter + row_iter * omapsize, 'C': 114514}, token)
+                    bulk = DataBulk(
+                        _modelname,
+                        _index,
+                        "FTR",
+                        _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
+                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": 114514},
+                        token,
+                    )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
-    
-    if mxLTD[layertype] == "NGCONV":
-        M = math.ceil((_layerclass.in_channel / _layerclass.group) * _layerclass.kernel_size ** 2 * 1.0 / MoraxConfig.RRAMXbarSize)
-        N = math.ceil((_layerclass.out_channel / _layerclass.group) * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = (_layerclass.in_channel / _layerclass.group) * _layerclass.kernel_size ** 2 / MoraxConfig.RRAMXbarSize
-        N_tail = (_layerclass.out_channel / _layerclass.group) / MoraxConfig.RRAMXbarSize
+
+    if layertype == LLT.NGCONV:
+        M = math.ceil(
+            (_layerclass.in_channel / _layerclass.group)
+            * _layerclass.kernel_size ** 2
+            * 1.0
+            / MoraxConfig.RRAMXbarSize
+        )
+        N = math.ceil(
+            (_layerclass.out_channel / _layerclass.group)
+            * 1.0
+            / MoraxConfig.RRAMXbarSize
+        )
+        M_tail = (
+            (_layerclass.in_channel / _layerclass.group)
+            * _layerclass.kernel_size ** 2
+            / MoraxConfig.RRAMXbarSize
+        )
+        N_tail = (
+            _layerclass.out_channel / _layerclass.group
+        ) / MoraxConfig.RRAMXbarSize
         rram_taskindex = -1
         vpu_taskindex = -1
-        
+
         for bat in range(_batch):
             for grp in range(_layerclass.group):
                 omapsize = _layerclass.feature_size / _layerclass.stride
@@ -382,34 +546,71 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                         # make simple bulk
                         datatype = "FTR"
                         bulkscratch = {}
-                        bulkscratch['B'] = bat
-                        bulkscratch['HW'] = col_iter + row_iter * omapsize
-                        bulkscratch['C'] = grp
-                        bs = _layerclass.kernel_size * _layerclass.in_channel * (MoraxConfig.PrecisionBits / 8) / _layerclass.group
-                        bs *= _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
+                        bulkscratch["B"] = bat
+                        bulkscratch["HW"] = col_iter + row_iter * omapsize
+                        bulkscratch["C"] = grp
+                        bs = (
+                            _layerclass.kernel_size
+                            * _layerclass.in_channel
+                            * (MoraxConfig.PrecisionBits / 8)
+                            / _layerclass.group
+                        )
+                        bs *= (
+                            _layerclass.kernel_size
+                            if col_iter == 0
+                            else _layerclass.stride
+                        )
                         bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
-                        qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
+                        qr = QueryBuffer(
+                            bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
+                        )
                         SubQueryList.append(copy.deepcopy(qr))
                         # make subexe query
                         # NOTE dict of group: [tuple1(clstid, nvtcid, sliceidlist), tuple2, ... ]
                         grpdict = _doclotnsl[grp]
                         for (clstid, nvtcid, sliceidlist) in grpdict:
                             rram_taskindex += 1
-                            rtasklabel = make_tasklabel(_modelname, _index, rram_taskindex, "NGCONV")
-                            qe = QueryExcuteOnNVTC(_layerclass, rtasklabel, "Xbar", LLT.NGCONV, nvtcid, clstid, sliceidlist)
+                            rtasklabel = make_tasklabel(
+                                _modelname, _index, rram_taskindex, "NGCONV"
+                            )
+                            qe = QueryExcuteOnNVTC(
+                                _layerclass,
+                                rtasklabel,
+                                "Xbar",
+                                LLT.NGCONV,
+                                nvtcid,
+                                clstid,
+                                sliceidlist,
+                            )
                             SubQueryList.append(copy.deepcopy(qe))
                         vpu_taskindex += 1
-                        vtasklabel = make_tasklabel(_modelname, _index, vpu_taskindex, "PostProcess")
-                        qv = QueryExcuteOnVPU(_layerclass, vtasklabel, 'PostProcess', LLT.NGCONV, (M, _layerclass.out_channel / _layerclass.group))
+                        vtasklabel = make_tasklabel(
+                            _modelname, _index, vpu_taskindex, "PostProcess"
+                        )
+                        qv = QueryExcuteOnVPU(
+                            _layerclass,
+                            vtasklabel,
+                            "PostProcess",
+                            LLT.NGCONV,
+                            (M, _layerclass.out_channel / _layerclass.group),
+                        )
                         SubQueryList.append(copy.deepcopy(qv))
                         # make writeback bulk
-                        bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.out_channel / _layerclass.group * (MoraxConfig.PrecisionBits / 8), \
-                                        {'B': bat, 'HW': col_iter + row_iter * omapsize, 'C': grp}, token)
+                        bulk = DataBulk(
+                            _modelname,
+                            _index,
+                            "FTR",
+                            _layerclass.out_channel
+                            / _layerclass.group
+                            * (MoraxConfig.PrecisionBits / 8),
+                            {"B": bat, "HW": col_iter + row_iter * omapsize, "C": grp},
+                            token,
+                        )
                         qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                         SubQueryList.append(copy.deepcopy(qw))
         # End for
 
-    if mxLTD[layertype] == "GEMM":
+    if layertype == LLT.GEMM:
         idxtup = _layerclass.input_indecies_tuple
         if idxtup[1] == 0:
             row_dim = _layerclass.k_dim
@@ -427,7 +628,7 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
         vfetch = 16
         V = math.ceil(v_dim * 1.0 / vfetch)
         rram_taskindex = -1
-        vpu_taskindex = -1     
+        vpu_taskindex = -1
         for bat in range(_batch):
             for vf in range(V):
                 for clstid, nvtclist in _doclotnsl.items():
@@ -435,50 +636,97 @@ def compileRRAM(_index, _modelname,  _layerclass, _doclotnsl: dict, _chip: Morax
                         (nvtcid, sliceidlist) = nvtctup
                         mapinfo = []
                         for info in sliceidlist:
-                            mapinfo.append(_chip.ClusterList[clstid].nvTensorCoreList[nvtcid].RRAMSliceObjList[info].layerinfo[1])
+                            mapinfo.append(
+                                _chip.ClusterList[clstid]
+                                .nvTensorCoreList[nvtcid]
+                                .RRAMSliceObjList[info]
+                                .layerinfo[1]
+                            )
                         bulkinfo = []
                         for tup in mapinfo:
                             if tup[0] not in bulkinfo:
                                 bulkinfo.append(tup[0])
                         # make query
-                        datatype = 'FTR'
+                        datatype = "FTR"
                         bulkscratch = {}
-                        bulkscratch['B'] = bat
-                        bulkscratch['M'] = vf
-                        bulkscratch['N'] = []
+                        bulkscratch["B"] = bat
+                        bulkscratch["M"] = vf
+                        bulkscratch["N"] = []
                         bs = 0
                         for inf in bulkinfo:
                             if inf == M and M_tail > 0:
                                 bs += M_tail
                             else:
                                 bs += MoraxConfig.RRAMXbarSize
-                        bulkscratch['N'].append(inf)
+                        bulkscratch["N"].append(inf)
                         bs = vfetch * bs * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(_modelname, _index, datatype, bs, bulkscratch)
-                        qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore) 
+                        qr = QueryBuffer(
+                            bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
+                        )
                         SubQueryList.append(copy.deepcopy(qr))
 
                 for line in range(vfetch):
                     for clstid, nvtclist in _doclotnsl.items():
                         for nvtctup in nvtclist:
                             rram_taskindex += 1
-                            tasklabel = make_tasklabel(_modelname, _index, rram_taskindex, "GEMM")
-                            qe = QueryExcuteOnNVTC(_layerclass, tasklabel, "Xbar", LLT.GEMM, nvtcid, clstid, sliceidlist)
+                            tasklabel = make_tasklabel(
+                                _modelname, _index, rram_taskindex, "GEMM"
+                            )
+                            qe = QueryExcuteOnNVTC(
+                                _layerclass,
+                                tasklabel,
+                                "Xbar",
+                                LLT.GEMM,
+                                nvtcid,
+                                clstid,
+                                sliceidlist,
+                            )
                             SubQueryList.append(copy.deepcopy(qe))
                     vpu_taskindex += 1
                     vtasklabel = make_tasklabel(_modelname, _index, 0, "PostProcess")
-                    qv = QueryExcuteOnVPU(_layerclass, vtasklabel, 'PostProcess', LLT.GEMM, (M, _layerclass.col_dim))
+                    qv = QueryExcuteOnVPU(
+                        _layerclass,
+                        vtasklabel,
+                        "PostProcess",
+                        LLT.GEMM,
+                        (M, _layerclass.col_dim),
+                    )
                     SubQueryList.append(copy.deepcopy(qv))
-                    bulk = DataBulk(_modelname, _index, 'FTR', _layerclass.col_dim * MoraxConfig.PrecisionBits / 8, \
-                                    {'B': bat, 'HW': 114514, 'C': 114514}, token)
+                    bulk = DataBulk(
+                        _modelname,
+                        _index,
+                        "FTR",
+                        _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                        {"B": bat, "HW": 114514, "C": 114514},
+                        token,
+                    )
                     qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
+    return SubQueryList
 
 
-def compileCMOS(layerclass, moraxchip: MoraxChip, batch):
-
-
+def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token):
+    SubQueryList = []
+    layertype = _layerclass.layer_type
+    onetcsize = MoraxConfig.PEArraySize * MoraxConfig.PEArrayNum
+    tcnum = MoraxConfig.TCNum
+    if layertype == LLT.Linear or layertype == LLT.VMM:
+        # for: M B N
+        M = math.ceil(_layerclass.row_dim * 1.0 / onetcsize)
+        N = math.ceil(_layerclass.col_dim * 1.0 / onetcsize)
+        B = _batch
+        for m in range(M):
+            bulkscratch = {}
+            if layertype == LLT.Linear:
+                bulkscratch['B'] = ALL
+                bulkscratch['HW'] = ALL
+                bulkscratch['C'] = m 
+            bulk = DataBulk(_modelname, _index, 'FTR', B * MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8, {'B':})
+            qrf = QueryBuffer()
+            for b in range(B):
+                for n in range(N):
 
 
 def generate_queries(
@@ -499,12 +747,22 @@ def generate_queries(
         assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
         if idx < len(_modelList):
             q = LayerQuery(
-                idx, _batch, _modelList[idx], _modelDAG.LayerAssignmentDict[idx], len(_modelDAG.fromVertexDict[idx]), len(_modelDAG.toVertexDict[idx])
+                idx,
+                _batch,
+                _modelList[idx],
+                _modelDAG.LayerAssignmentDict[idx],
+                len(_modelDAG.fromVertexDict[idx]),
+                len(_modelDAG.toVertexDict[idx]),
             )
         else:
             oidx = get_idx_from_concat(idx, concatlist)
             q = LayerQuery(
-                idx, _batch, _modelList[oidx], _modelDAG.LayerAssignmentDict[idx], len(_modelDAG.fromVertexDict[idx]), len(_modelDAG.toVertexDict[idx])
+                idx,
+                _batch,
+                _modelList[oidx],
+                _modelDAG.LayerAssignmentDict[idx],
+                len(_modelDAG.fromVertexDict[idx]),
+                len(_modelDAG.toVertexDict[idx]),
             )
         # q.compile()
         _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
