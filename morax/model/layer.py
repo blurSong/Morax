@@ -118,6 +118,7 @@ class Linear(LinearLayer):
         self.row_dim = self.layer_csvline[mxLCD_CNN["IC"]]
         self.col_dim = self.layer_csvline[mxLCD_CNN["OC"]]
         self.is_activated = False if self.layer_csvline[mxLCD_CNN["RP"]] == 0 else True
+        self.input_indecies_tuple = (self.layer_csvline[mxLCD_CNN["IDX"]], 0)
 
 
 class CONV(LinearLayer):

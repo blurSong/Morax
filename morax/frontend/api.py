@@ -19,6 +19,10 @@ from morax.frontend.csvparser import apdidx2_is_index2
 from morax.model.layer import mxLCD_CNN, mxLCD_GEMM, mxLTD, mxNTD
 
 
+def get_lookup_adress(_modelname, _index, _chn):
+    return (1, 1, [2, 3])
+
+
 def read_morax_csv(_modelpath, _modelname, _isnorm=False):
     if _isnorm is True:
         csv = _modelname + "_norm.csv"
