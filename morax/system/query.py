@@ -30,6 +30,7 @@ import math
 from morax.model.model import ModelDAG, ModelList, ModelType
 from morax.frontend.api import get_idx_from_concat, get_lookup_adress
 
+
 # [bulk]
 # indicate the data form of input and weight
 # bulkfrom = (part or whole) feature: NCHW  weight: KCRS  MVM & GEMM: TODO
@@ -43,6 +44,25 @@ from morax.frontend.api import get_idx_from_concat, get_lookup_adress
 # RRAM: CHWN onefeaturebyonefeature    OS: HWNC onechannelbyonechannel (FOR MAX KERNEL REUSE)
 # TODO
 # tasklabel = modelname_'L'+layeridx_'T'+taskidx_taskform
+
+
+class VritualQuery:
+    def __init__(self, _execution: VO):
+        self.execution = _execution
+
+
+class VritualQueryStart(VritualQuery):
+    def __init__(self, _execution):
+        super().__init__(_execution)
+
+
+class VritualQueryMonitor(VritualQuery):
+    def __init__(self, _execution, _thisidx, _thatidx, _actmod: str, _actlist=[]):
+        super().__init__(_execution)
+        self.thisidx = _thisidx
+        self.thatidx = _thatidx
+        self.actmod = _actmod
+        self.actlist = copy.deepcopy(_actlist)
 
 
 class QueryBuffer:
@@ -176,9 +196,9 @@ class QueryDMA:
         self.toCluster = _toCluster
 
 
-""" ================================================================
-## generate layer query and compilie them to sub query
-====================================================================
+""" ========================================================================================================================
+                     generate layer query and compilie them to sub query
+============================================================================================================================
 """
 
 
@@ -206,17 +226,18 @@ class LayerQuery:
                 self.layerclass.layer_index
             ), "{}".format(self.layerclass.layer_name)
 
-    def compile(self, _modelname, moraxchip: MoraxChip):
+    def compile(self, _modelname, moraxchip: MoraxChip, concatlist=[]):
         # Generate subqueries of this layer query
         print("[Morax][System] Compiling Query {}.".format(self.q_index))
         layertype = self.layerclass.layer_type
-        tc = MoraxConfig.TCNum
-        pearray = MoraxConfig.PEArrayNum
-        pesize = MoraxConfig.PEArraySize
         if layertype in LLT:
-            if self.assignment:  # on NVTC
-                self.SubQueryList.append(
-                    copy.deepcopy(
+            if layertype == LLT.CONCAT:
+                self.SubQueryList = copy.deepcopy(
+                    compileCONCAT(self.q_index, self.layerclass, concatlist)
+                )
+            else:
+                if self.assignment:  # on NVTC
+                    self.SubQueryList = copy.deepcopy(
                         compileRRAM(
                             self.q_index,
                             _modelname,
@@ -227,24 +248,90 @@ class LayerQuery:
                             self.iodegree["out"],
                         )
                     )
-                )
-            else:
-                self.SubQueryList.append(
-                    copy.deepcopy(
+                else:
+                    self.SubQueryList = copy.deepcopy(
                         compileCMOS(
                             self.q_index,
                             _modelname,
                             self.layerclass,
                             moraxchip,
                             self.batch,
+                            self.iodegree["out"],
                         )
                     )
-                )
-
-        # Read
-        # Excute
-        # WriteBack
+        elif layertype in NLT:
+            self.SubQueryList = copy.deepcopy(compileVPU())
         return
+
+
+def generate_queries(
+    _modelList: ModelList,
+    _modelDAG: ModelDAG,
+    _moraxchip: MoraxChip,
+    concatlist=[],
+    _batch=1,
+):
+    modeltype = ModelDAG.modeltype
+    modelname = ModelDAG.modelname
+    layernumL = _modelList.layernum
+    layernumG = _modelDAG.layernum
+    if layernumL != layernumG and modeltype != ModelType.MHATTENTION:
+        print(
+            "[Morax][System] generate queries fatal, layernum of List({}) and DAG({}) are different.".format(
+                layernumL, layernumG
+            )
+        )
+        raise DataError
+    totalquery = 0
+    for idx in _modelDAG.LayerIndexList:
+        assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
+        if idx < len(_modelList):
+            q = LayerQuery(
+                idx,
+                _batch,
+                _modelList[idx],
+                _modelDAG.LayerAssignmentDict[idx],
+                len(_modelDAG.fromVertexDict[idx]),
+                len(_modelDAG.toVertexDict[idx]),
+            )
+        else:
+            oidx = get_idx_from_concat(idx, concatlist)
+            q = LayerQuery(
+                idx,
+                _batch,
+                _modelList[oidx],  # TODO: CHANGE INDEX TUPLE of layerclass
+                _modelDAG.LayerAssignmentDict[idx],
+                len(_modelDAG.fromVertexDict[idx]),
+                len(_modelDAG.toVertexDict[idx]),
+            )
+        q.compile(modelname, _moraxchip, concatlist)
+        _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
+        totalquery += 1
+    assert totalquery == _modelDAG.layernum
+
+    # NOTE DAG begins with virtual layer -1
+    # Branch conds:
+    # 1 Residual -> this cluster
+    # 2 CONCAT multi-head -> one head one cluster
+    # 3 CONCAT group or next multi-path ->try to use less clusters
+
+
+def generate_queries_mt(
+    _modelList1,
+    _modelList2,
+    _modelDAG1,
+    _modelDAG2,
+    _modeltype1,
+    _modeltype2,
+    _assignmentList1,
+    _assignmentList2,
+    _batch=1,
+):
+    layernum1 = len(_modelList1)
+    layernum2 = len(_modelList2)
+    assert layernum1 == len(_assignmentList1)
+    assert layernum2 == len(_assignmentList2)
+    return
 
 
 def make_tasklabel(mn, li, ti, bf: str):
@@ -252,6 +339,26 @@ def make_tasklabel(mn, li, ti, bf: str):
 
 
 ALL = 114514
+
+
+def compileCONCAT(_index, _layerclass, _concatlist):
+    #  list of concattuple = (liststartidx, head2beginidx, head, attentionlayer)
+    VSubQueryList = []
+    for tup in _concatlist:
+        if _index == tup[3] + tup[0]:
+            this_concattup = copy.deepcopy(tup)
+    assert this_concattup
+    heads = this_concattup[2]
+    assert heads == _layerclass.head
+    for hd in range(heads):
+        if hd == 0:
+            vqem = VritualQueryMonitor(VO.EditMemonitor, _index - 1, _index, "CONCAT")
+            VSubQueryList.append(vqem)
+        else:
+            this_index = this_concattup[1] * (hd - 1) + this_concattup[3] - 1
+            vqem = VritualQueryMonitor(VO.EditMemonitor, this_index, _index, "CONCAT")
+            VSubQueryList.append(vqem)
+    return VSubQueryList
 
 
 def compileRRAM(
@@ -1926,6 +2033,18 @@ def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token
                 SubQueryList.append(copy.deepcopy(qw))
         # End for
     # End CMOS
+    return SubQueryList
+
+
+def compileVPU(_index,_modelname, _layerclass, _batch, _token):
+    SubQueryList = []
+    layertype = _layerclass.layer_type
+    vpu_taskindex = -1
+    # Now only consider NLT
+    if layertype == NLT.Pooling:
+        
+
+    return SubQueryList
 
 
 def make_tc_task_list(_tasklen):
@@ -1940,67 +2059,3 @@ def make_tc_task_list(_tasklen):
         else:
             ttltup[peid] = (0, 0)
     return ttltup
-
-
-def generate_queries(
-    _modelList: ModelList, _modelDAG: ModelDAG, _modeltype, concatlist=[], _batch=1
-):
-    # _modelDAG to one sequential queryList using BFS
-    layernumL = _modelList.layernum
-    layernumG = _modelDAG.layernum
-    if layernumL != layernumG and _modeltype != ModelType.MHATTENTION:
-        print(
-            "[Morax][System] generate queries fatal, layernum of List({}) and DAG({}) are different.".format(
-                layernumL, layernumG
-            )
-        )
-        raise DataError
-    totalquery = 0
-    for idx in _modelDAG.LayerIndexList:
-        assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
-        if idx < len(_modelList):
-            q = LayerQuery(
-                idx,
-                _batch,
-                _modelList[idx],
-                _modelDAG.LayerAssignmentDict[idx],
-                len(_modelDAG.fromVertexDict[idx]),
-                len(_modelDAG.toVertexDict[idx]),
-            )
-        else:
-            oidx = get_idx_from_concat(idx, concatlist)
-            q = LayerQuery(
-                idx,
-                _batch,
-                _modelList[oidx],  # TODO: CHANGE INDEX TUPLE
-                _modelDAG.LayerAssignmentDict[idx],
-                len(_modelDAG.fromVertexDict[idx]),
-                len(_modelDAG.toVertexDict[idx]),
-            )
-        # q.compile()
-        _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
-        totalquery += 1
-    assert totalquery == _modelDAG.layernum
-
-    # NOTE DAG begins with virtual layer -1
-    # Branch conds:
-    # 1 Residual -> this cluster
-    # 2 CONCAT multi-head -> one head one cluster
-    # 3 CONCAT group or next multi-path ->try to use less clusters
-
-
-def generate_queries_mt(
-    _modelList1,
-    _modelList2,
-    _modelDAG1,
-    _modelDAG2,
-    _modeltype1,
-    _modeltype2,
-    _assignmentList1,
-    _assignmentList2,
-    _batch=1,
-):
-    layernum1 = len(_modelList1)
-    layernum2 = len(_modelList2)
-    assert layernum1 == len(_assignmentList1)
-    assert layernum2 == len(_assignmentList2)

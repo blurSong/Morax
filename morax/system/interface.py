@@ -44,15 +44,17 @@ class TransmissionOperator(Enum):
     ClusterTransfer = 301
 
 
-class SystemVirtualOperator(Enum):
+class VirtualOperator(Enum):
     SystemStart = 400
     SystemStop = 401
+    EditMemonitor = 402
 
 
 CC = ClusterComponent
 SO = SystemOperator
 BO = BufferOperator
 TO = TransmissionOperator
+VO = VirtualOperator
 
 
 MoraxExecutionDict = {
