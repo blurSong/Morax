@@ -1780,6 +1780,152 @@ def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token
         # End for
 
     if layertype == LLT.GEMM:
+        if IIleft == 0:
+            row_dim = _layerclass.m_dim
+            col_dim = _layerclass.k_dim
+            v_dim = _layerclass.n_dim
+        else:
+            row_dim = _layerclass.k_dim
+            col_dim = _layerclass.n_dim
+            v_dim = _layerclass.m_dim
+        M = math.ceil(row_dim * 1.0 / MoraxConfig.PEArraySize)
+        N = math.ceil(col_dim * 1.0 / MoraxConfig.PEArraySize)
+        M_tail = row_dim % MoraxConfig.RRAMXbarSize
+        N_tail = col_dim % MoraxConfig.RRAMXbarSize
+        B = _batch
+        # for m in range(M):
+        # BMN
+        pepart = 0
+        listof_tasksize_listoftup = []
+        listof_minfo_list = []
+        listof_ninfo_list = []
+        while pepart < M * N:
+            tasksize_listoftup = []
+            minfo_list = []
+            ninfo_list = []
+            for peid in range(MoraxConfig.PEArrayNum):
+                pesizetup = []
+                if pepart + peid >= M * N:
+                    pesizetup[0] = 0
+                    pesizetup[1] = 0
+                else:
+                    mm = (pepart + peid) / N
+                    nn = (pepart + peid) % N
+                    if mm == M - 1 and M_tail > 0:
+                        pesizetup[0] = M_tail
+                    else:
+                        pesizetup[0] = MoraxConfig.PEArraySize
+                    if nn == N - 1 and N_tail > 0:
+                        pesizetup[1] = N_tail
+                    else:
+                        pesizetup[1] = MoraxConfig.PEArraySize
+                    if mm not in minfo_list:
+                        minfo_list.append(mm)
+                    if nn not in ninfo_list:
+                        ninfo_list.append(nn)
+                tasksize_listoftup.append(tuple(pesizetup))
+            listof_tasksize_listoftup.append(tasksize_listoftup)
+            listof_minfo_list.append(minfo_list)
+            listof_ninfo_list.append(ninfo_list)
+            pepart += MoraxConfig.PEArrayNum
+        LOTL = listof_tasksize_listoftup
+        LOML = listof_minfo_list
+        LONL = listof_ninfo_list
+        for tctask_idx in range(len(LOTL)):
+            minfo_list = LOML[tctask_idx]
+            tasksize_listoftup = LOTL[tctask_idx]
+            # make weight op bulk
+            wmbulkscratch = {}
+            datatype = "MAT"
+            wmbulkscratch["B"] = ALL
+            wmbulkscratch["M"] = minfo_list
+            wmbulkscratch["N"] = ALL
+            wmbulksize = (
+                len(ninfo_list)
+                * MoraxConfig.PEArraySize
+                * row_dim
+                * MoraxConfig.PrecisionBits
+                / 8
+            )
+            if IIleft == 0:
+                wmbulk = DataBulk(
+                    _modelname, _index + IIleft, datatype, wmbulksize, wmbulkscratch,
+                )
+                qrwm = QueryBuffer(wmbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrwm))
+            elif IIright == 0:
+                wmbulk = DataBulk(
+                    _modelname, _index + IIright, datatype, wmbulksize, wmbulkscratch,
+                )
+                qrwm = QueryBuffer(wmbulk, BO.Read, ICtypeRight, CC.TensorCore)
+                SubQueryList.append(copy.deepcopy(qrwm))
+            # make input op bulk
+            for bat in range(B):
+                imbulkscratch = {}
+                datatype = "MAT"
+                imbulkscratch["B"] = bat
+                imbulkscratch["M"] = minfo_list
+                imbulkscratch["N"] = ALL
+                imbulksize = (
+                    len(minfo_list)
+                    * MoraxConfig.PEArraySize
+                    * row_dim
+                    * MoraxConfig.PrecisionBits
+                    / 8
+                )
+                if IIleft < 0:
+                    imbulk = DataBulk(
+                        _modelname,
+                        _index + IIleft,
+                        datatype,
+                        imbulksize,
+                        imbulkscratch,
+                    )
+                    qrim = QueryBuffer(imbulk, BO.Read, ICtypeLeft, CC.TensorCore)
+                    SubQueryList.append(copy.deepcopy(qrwm))
+                if IIright < 0:
+                    imbulk = DataBulk(
+                        _modelname,
+                        _index + IIright,
+                        datatype,
+                        imbulksize,
+                        imbulkscratch,
+                    )
+                    qrim = QueryBuffer(imbulk, BO.Read, ICtypeRight, CC.TensorCore)
+                    SubQueryList.append(copy.deepcopy(qrim))
+                # make query
+                cmos_taskindex += 1
+                ctasklabel = make_tasklabel(
+                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                )
+                tcbulksize = imbulksize
+                if bat == 0:
+                    tcbulksize += wmbulksize
+                qe = QueryExcuteOnTC(
+                    _layerclass,
+                    ctasklabel,
+                    "OS",
+                    layertype,
+                    tasksize_listoftup,
+                    tcbulksize,
+                )
+                SubQueryList.append(copy.deepcopy(qe))
+                # make writeback query
+                msize2d = 0
+                for tup in tasksize_listoftup:
+                    msize2d += tup[0] * tup[1]
+                wbbulk = DataBulk(
+                    _modelname,
+                    _index,
+                    "MAT",
+                    msize2d * MoraxConfig.PrecisionBits / 8,
+                    {"B": bat, "M": minfo_list, "N": ninfo_list},
+                    token,
+                )
+                qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qw))
+        # End for
+    # End CMOS
 
 
 def make_tc_task_list(_tasklen):
