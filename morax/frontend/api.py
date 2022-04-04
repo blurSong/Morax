@@ -20,6 +20,7 @@ from morax.model.layer import mxLCD_CNN, mxLCD_GEMM, mxLTD, mxNTD
 
 
 def get_lookup_adress(_modelname, _index, _chn):
+    # NOTE fake func because no real data
     return (1, 1, [2, 3])
 
 

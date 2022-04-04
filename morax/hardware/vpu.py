@@ -13,7 +13,10 @@ from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict, UserList
 from morax.system.config import MoraxConfig
 from morax.system.query import QueryExcuteOnVPU
-from morax.model.layer import Softmax1D, Softmax2D
+from morax.model.layer import (
+    LinearLayerType as LLT,
+    NonlinearLayerType as NLT,
+)
 
 VPUExe = MoraxExecutionDict[ClusterComponent.VPU]
 
@@ -50,7 +53,7 @@ class VPU:
             # max trick + [max-8） drop + exp LUT  + div LUT
             vdim = (
                 q_vpu.layerclass.v_dim
-                if isinstance(q_vpu.layerclass, Softmax1D)
+                if q_vpu.layerclass.layertype == NLT.Softmax1D
                 else q_vpu.layerclass.col_dim
             )
             # SO.VMAX
@@ -60,13 +63,14 @@ class VPU:
                 )
                 vad.Mul = 0
                 vad.Add = get_reducetime(vdim)
-            # SO.Vnorm
+            # SO.VNORM
             elif q_vpu.execution == VPUExe[8]:
-                runtime = runtime = (
-                    math.ceil((float(vdim) / self.lanesize) / self.lanenum) * 2
+                runtime = (
+                    math.ceil((float(vdim) / self.lanesize) / self.lanenum)
+                    + vdim ** 0.5
                 )
                 vad.Mul = vdim
-                vad.Add = vdim
+                vad.Add = get_reducetime(vdim)
         else:
             # LLT.VDP: one op
             # LLT.VMM == LLT.Linear: one output

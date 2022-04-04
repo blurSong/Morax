@@ -31,7 +31,7 @@ class SystemOperator(Enum):
     HWNC2CHWN = 103
     CHWN2HWNC = 104
     VMAX = 105
-    Vnorm = 106
+    VNORM = 106
 
 
 class BufferOperator(Enum):
@@ -93,7 +93,7 @@ MoraxExecutionDict = {
         LLT.Layernorm,
         NLT.Pooling,
         SO.VMAX,
-        SO.Vnorm,
+        SO.VNORM,
         # NLT.Softmax1D,
         # NLT.Softmax2D,
     ],

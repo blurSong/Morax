@@ -146,12 +146,12 @@ class QueryExcuteOnVPU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(int, int),
+        _tasksize: tuple(int, int) = (0, 0),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize  #  (rowparts, collines)
+        self.tasksize = _tasksize  # (rowparts, collines)
         assert self.checkquery() is True
 
     def checkquery(self):
@@ -168,7 +168,7 @@ class QueryExcuteOnSMU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(int, int),
+        _tasksize: tuple(int, int) = (0, 0),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
@@ -2036,13 +2036,133 @@ def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token
     return SubQueryList
 
 
-def compileVPU(_index,_modelname, _layerclass, _batch, _token):
+def compileVPU(_index, _modelname, _layerclass, _batch, _token):
     SubQueryList = []
     layertype = _layerclass.layer_type
     vpu_taskindex = -1
+    smu_taskindex = -1
+    lut_taskindex = -1
     # Now only consider NLT
     if layertype == NLT.Pooling:
-        
+        B = _batch
+        C = _layerclass.channel
+        ofsize = _layerclass.feature_size / _layerclass.kernel_size
+        for bat in range(B):
+            for ch in range(C):
+                # rf
+                datatype = "FTR"
+                fbulkscratch = {}
+                fbulkscratch["B"] = bat
+                fbulkscratch["HW"] = ALL
+                fbulkscratch["C"] = ch
+                fbs = _layerclass.feature_size ** 2 * MoraxConfig.PrecisionBits / 8
+                fbulk = DataBulk(
+                    _modelname,
+                    _index + _layerclass.input_indecies_tuple[0],
+                    datatype,
+                    fbs,
+                    fbulkscratch,
+                )
+                qrf = QueryBuffer(fbulk, BO.Read, CC.FeatureBuffer, CC.VPU)
+                SubQueryList.append(copy.deepcopy(qrf))
+                # query
+                vpu_taskindex += 1
+                vtasklabel = make_tasklabel(
+                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                )
+                qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Linear", NLT.Pooling,)
+                SubQueryList.append(copy.deepcopy(qv))
+                # wb
+                wbs = ofsize ** 2 * MoraxConfig.PrecisionBits / 8
+                wbbulk = DataBulk(_modelname, _index, datatype, wbs, fbulkscratch,)
+                qwb = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qwb))
+        # End for
+
+    if layertype == NLT.Softmax1D or NLT.Softmax2D:
+        B = _batch
+        L = 1 if layertype == NLT.Softmax1D else _layerclass.row_dim
+        V = _layerclass.v_dim if layertype == NLT.Softmax1D else _layerclass.col_dim
+        for bat in range(B):
+            for line in range(L):
+                # read
+                datatype = "VEC" if layertype == NLT.Softmax1D else "MAT"
+                rbulkscratch = {}
+                rbulkscratch["B"] = bat
+                rbulkscratch["M"] = line if layertype == NLT.Softmax2D else ALL
+                rbulkscratch["N"] = ALL
+                rbs = V * MoraxConfig.PrecisionBits / 8
+                rbulk = DataBulk(
+                    _modelname,
+                    _index + _layerclass.input_indecies_tuple[0],
+                    datatype,
+                    rbs,
+                    rbulkscratch,
+                )
+                qr = QueryBuffer(rbulk, BO.Read, CC.FeatureBuffer, CC.VPU)
+                SubQueryList.append(copy.deepcopy(qr))
+                # vmax
+                vpu_taskindex += 1
+                vtasklabel = make_tasklabel(
+                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                )
+                qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Softmax", SO.VMAX,)
+                SubQueryList.append(copy.deepcopy(qv))
+                # SO.Truncation
+                smu_taskindex += 1
+                stasklabel = make_tasklabel(
+                    _modelname, _index, smu_taskindex, mxNTD[layertype]
+                )
+                qsmu = QueryExcuteOnSMU(
+                    _layerclass, stasklabel, "UpStream", SO.Truncation,
+                )
+                SubQueryList.append(copy.deepcopy(qsmu))
+                # exp lut
+                for v in range(V):
+                    lut_taskindex += 1
+                    luttasklabel = make_tasklabel(
+                        _modelname, _index, lut_taskindex, mxLTD[layertype]
+                    )
+                    lutadress = get_lookup_adress(_modelname, _index, line)
+                    qlut = QueryExcuteOnNVTC(
+                        _layerclass,
+                        luttasklabel,
+                        "LUT8",
+                        SO.LookUp,
+                        lutadress[0],
+                        lutadress[1],
+                        lutadress[2],
+                    )
+                    SubQueryList.append(copy.deepcopy(qlut))
+                # norm
+                # lutdiv
+                lut_taskindex += 1
+                luttasklabel = make_tasklabel(
+                    _modelname, _index, lut_taskindex, mxLTD[layertype]
+                )
+                lutadress = get_lookup_adress(_modelname, _index, line)
+                qlut = QueryExcuteOnNVTC(
+                    _layerclass,
+                    luttasklabel,
+                    "LUT16",
+                    SO.LookUp,
+                    lutadress[0],
+                    lutadress[1],
+                    lutadress[2],
+                )
+                SubQueryList.append(copy.deepcopy(qlut))
+                # vnrom
+                vpu_taskindex += 1
+                vtasklabel = make_tasklabel(
+                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                )
+                qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Softmax", SO.VNORM,)
+                SubQueryList.append(copy.deepcopy(qv))
+                # write
+                wbulk = DataBulk(_modelname, _index, datatype, rbs, rbulkscratch,)
+                qw = QueryBuffer(wbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+                SubQueryList.append(copy.deepcopy(qw))
+        # Eno for
 
     return SubQueryList
 
