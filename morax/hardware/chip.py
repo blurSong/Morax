@@ -31,8 +31,10 @@ class MoraxChip:
             self.ClusterList.append(copy.deepcopy(clst))
         self.MoraxTileFilm = TF.TimeFilm()
 
-    def invoke_morax(self, _modeldag: ModelDAG, _memonitor: MM.Strachpad):
+    def invoke_morax(self, _modeldag: ModelDAG, _monitor: MM.Memonitor):
         # RRAM:
         # CMOS:
-        vindex = -1
-
+        thisrun_index = -1
+        CandidateLayerList = []
+        while True:
+            

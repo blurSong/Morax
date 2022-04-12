@@ -12,7 +12,7 @@ from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict
 from morax.system.config import MoraxConfig, HWParam
 from morax.system.query import QueryBuffer
-from morax.system.memonitor import StrachPad
+from morax.system.memonitor import Scratchpad
 
 """
 # [bulk]
@@ -28,9 +28,11 @@ from morax.system.memonitor import StrachPad
     layerindex: int
     datatype: str (WET or FTR or VEC or MAT)
     bulksizeByte: int
-    K:           B:
-    C:           C:
-    RS:          HW:
+    bulkscratch tuple, (begin, end)
+    K:           B:          B:           B:
+    C:           C:          M:           M:
+    R:           H:                       N:
+    S:           W:
     bulklabel: str
 
 
@@ -84,13 +86,12 @@ class BufferIOActionDict:
         self.Write = 0
 
 
-class ScratchPadBuffer:
+class ScratchpadBuffer:
     def __init__(self, _sizeKB, _bandwidthgbps=0) -> None:
         self.CapacityByte = _sizeKB * 1024
         self.WaterLineByte = 0
         self.BandwidthGbps = _bandwidthgbps
-        self.MemScratchPad = {}
-        # self.LabelSet = set()
+        self.Scratchpad = Scratchpad()
         self.TimeFilm = TimeFilm()
         self.BufferIOList = []
 
@@ -98,24 +99,19 @@ class ScratchPadBuffer:
         if self.WaterLineByte + _databulk.sizebyte > self.CapacityByte:
             # TODO
             raise Exception("Buffer overflowed.")
-        elif _databulk.label in self.MemScratchPad:
+        elif _databulk.label in self.Scratchpad:
             # TODO
             raise Exception("Buffer duplicated.")
         else:
             # self.LabelSet.add(_databulk.label)
-            self.MemScratchPad[_databulk.label] = copy.deepcopy(_databulk)
+            self.Scratchpad.writeANote(_databulk)
             self.WaterLineByte += _databulk.sizebyte
 
-    def read_buffer(self, _datalabel: str) -> str:
-        if _datalabel in self.MemScratchPad:
-            self.MemScratchPad[_datalabel].token -= 1
-            if self.MemScratchPad[_datalabel].token == 0:
-                self.WaterLineByte -= self.MemScratchPad[_datalabel].sizebyte
-                del self.MemScratchPad[_datalabel]
-            return "Success"
-        else:
-            # Shuld read form other cluster or DRAM
-            return "False"
+    def read_buffer(self, _databulk: DataBulk) -> str:
+        return self.Scratchpad.readANote(_databulk)
+    
+    def release(self, note):
+        
 
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution
@@ -126,7 +122,7 @@ class ScratchPadBuffer:
             self.write_buffer(_q_buffer.databulkclass)
             bioatd.Write = _q_buffer.databulkclass.sizebyte
         else:
-            read_result = self.read_buffer(_q_buffer.databulkclass.label)
+            read_result = self.read_buffer(_q_buffer.databulkclass)
             if read_result == "Success":
                 bioatd.Read = _q_buffer.databulkclass.sizebyte
             else:

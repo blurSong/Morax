@@ -22,8 +22,8 @@ import vpu
 class MoraxCluster:
     def __init__(self, _clusterid: int) -> None:
         self.clusterid = _clusterid
-        self.WeightBuffer = buffer.ScratchPadBuffer(MoraxConfig.WeightBufferSizeKB, 0)
-        self.FeatureBuffer = buffer.ScratchPadBuffer(
+        self.WeightBuffer = buffer.ScratchpadBuffer(MoraxConfig.WeightBufferSizeKB, 0)
+        self.FeatureBuffer = buffer.ScratchpadBuffer(
             MoraxConfig.FeatureBufferSizeKB, MoraxConfig.FeatureBufferBandwidthGbps
         )
         self.VPU = vpu.VPU()
