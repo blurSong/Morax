@@ -8,14 +8,14 @@ import subprocess as SP
 import multiprocessing as MP
 import copy
 import re
-from morax.system.timefilm import TimeFilm, TimeStamp
-from morax.system.config import MoraxConfig, HWParam
-import morax.system.query as Q
-import buffer
-import nvtensorcore
-import tensorcore
-import smu
-import vpu
+
+import morax.system.interface as IF
+import morax.system.query as QR
+import morax.system.timefilm as TF
+import morax.system.config as CF
+import morax.system.memonitor as MM
+from morax.model.model import ModelDAG
+
 import dma_bus
 import cluster
 
@@ -24,13 +24,15 @@ class MoraxChip:
     def __init__(self) -> None:
         self.DMA = dma_bus.DMA()
         self.RingBus = dma_bus.RingBus()
-        self.ClusterNum = MoraxConfig.ClusterNum
+        self.ClusterNum = CF.MoraxConfig.ClusterNum
         self.ClusterList = []
         for clstid in range(self.ClusterNum):
             clst = cluster.MoraxCluster(clstid)
             self.ClusterList.append(copy.deepcopy(clst))
-        self.MoraxTileFilm = TimeFilm()
+        self.MoraxTileFilm = TF.TimeFilm()
 
-    def invoke_morax(self, _q_layer: Q.LayerQuery, _issue_t: int):
+    def invoke_morax(self, _modeldag: ModelDAG, _memonitor: MM.Strachpad):
         # RRAM:
-        # CMOS: 最小的调度单位为batch， 同一个TC运行到完成分块的所有batch
+        # CMOS:
+        vindex = -1
+

@@ -4,8 +4,6 @@
 # Last modification: 0316
 
 
-from ast import If
-from lzma import MODE_FAST
 from sqlite3 import DataError
 import queue
 import sys
@@ -217,6 +215,7 @@ class LayerQuery:
         self.assignment = _assignment
         self.layerclass = copy.deepcopy(_layerclass)
         self.iodegree = {"in": _indegree, "out": _outdegree}
+        self.subquerynum = 0
         self.SubQueryList = []
 
         # assignment: listoftuple_clstid_nvtcid_sliceidlist
@@ -260,7 +259,16 @@ class LayerQuery:
                         )
                     )
         elif layertype in NLT:
-            self.SubQueryList = copy.deepcopy(compileVPU())
+            self.SubQueryList = copy.deepcopy(
+                compileVPU(
+                    self.q_index,
+                    _modelname,
+                    self.layerclass,
+                    self.batch,
+                    self.iodegree["out"],
+                )
+            )
+        self.subquerynum = len(self.SubQueryList)
         return
 
 

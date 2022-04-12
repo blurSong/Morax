@@ -12,11 +12,12 @@ from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict
 from morax.system.config import MoraxConfig, HWParam
 from morax.system.query import QueryBuffer
+from morax.system.memonitor import StrachPad
 
 """
 # [bulk]
 # indicate the data form of input and weight
-# bulkfrom = (part or whole) FTR: BCHW    WET: KCRS    VEC:BMN   MAT: BMN
+# bulkfrom = (part or whole) FTR: BCHW    WET: KCRS    VEC:BM   MAT: BMN
 # dataname = FTR WET VEC MAT
 # bulklabel = modelname_ 'L'+layeridx_ 'WET_' bulksizeByte_ bulkfrom
 # bulklabel = modelname_ 'L'+layeridx_ 'FTR_' bulksizeByte_ bulkfrom
@@ -25,7 +26,7 @@ from morax.system.query import QueryBuffer
 #
     modelname: str
     layerindex: int
-    datatype: str (WET or FTR)
+    datatype: str (WET or FTR or VEC or MAT)
     bulksizeByte: int
     K:           B:
     C:           C:
