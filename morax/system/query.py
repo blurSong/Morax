@@ -182,16 +182,26 @@ class QueryExcuteOnSMU(QueryExcute):
 
 
 class QueryRingBus:
-    def __init__(self, _databulkclass: DataBulk, _fromCluster, _toCluster):
+    def __init__(
+        self,
+        _databulkclass: DataBulk,
+        _subbulksize: int,
+        _fromCluster,
+        _toCluster,
+        _worf,
+    ):
         self.databulkclass = _databulkclass
+        self.subbulksizebyte = _subbulksize
         self.fromCluster = _fromCluster
         self.toCluster = _toCluster
+        self.worf = _worf
 
 
 class QueryDMA:
-    def __init__(self, _databulkclass: DataBulk, _toCluster):
+    def __init__(self, _databulkclass: DataBulk, _toCluster, _worf):
         self.databulkclass = _databulkclass
         self.toCluster = _toCluster
+        self.worf = _worf
 
 
 """ ========================================================================================================================
