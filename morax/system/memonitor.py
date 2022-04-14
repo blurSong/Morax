@@ -65,8 +65,8 @@ class Scratchpad:
         if note in self.Scratchpad:
             self.Scratchpad[note]["sizebyte"] += _bulk.bulksizebyte
             abulknote = bulknote(_bulk)
-            if abulknote
-            self.Scratchpad[note]["bulknotelist"].append(copy.deepcopy(abulknote))
+            if abulknote not in self.Scratchpad[note]["bulknotelist"]:
+                self.Scratchpad[note]["bulknotelist"].append(copy.deepcopy(abulknote))
             # assert self.Scratchpad[note]["token"] == _bulk.token
             # NOTE token is maintained in monitor
         else:
@@ -123,25 +123,57 @@ class Scratchpad:
                     clist.append(bulknote.scratchdict["C"])
                     hlist.append(bulknote.scratchdict["H"])
                     wlist.append(bulknote.scratchdict["W"])
-                bchwlist = list(zip(blist, clist, hlist, wlist))  # [((b0,b1), (c0,c1), (h0,h1), (w0,w1)), ..., ]
+                bchwlist = list(
+                    zip(blist, clist, hlist, wlist)
+                )  # [((b0,b1), (c0,c1), (h0,h1), (w0,w1)), ..., ]
                 bchwlist.sort(key=takeone, reverse=False)
                 subbulksize = 0
                 for bchwtup in bchwlist:
-                    b00, b11 = check_range(_bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bchwtup[0])
-                    c00, c11 = check_range(_bulk.bulkscratch["C"][0], _bulk.bulkscratch["C"][1], bchwtup[1]) 
-                    h00, h11 = check_range(_bulk.bulkscratch["H"][0], _bulk.bulkscratch["H"][1], bchwtup[2])
-                    w00, w11 = check_range(_bulk.bulkscratch["W"][0], _bulk.bulkscratch["W"][1], bchwtup[3])
-                    if isrange(b00, b11) and isrange(c00, c11) and isrange(h00, h11) and isrange(w00, w11):
+                    b00, b11 = check_range(
+                        _bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bchwtup[0]
+                    )
+                    c00, c11 = check_range(
+                        _bulk.bulkscratch["C"][0], _bulk.bulkscratch["C"][1], bchwtup[1]
+                    )
+                    h00, h11 = check_range(
+                        _bulk.bulkscratch["H"][0], _bulk.bulkscratch["H"][1], bchwtup[2]
+                    )
+                    w00, w11 = check_range(
+                        _bulk.bulkscratch["W"][0], _bulk.bulkscratch["W"][1], bchwtup[3]
+                    )
+                    if (
+                        isrange(b00, b11)
+                        and isrange(c00, c11)
+                        and isrange(h00, h11)
+                        and isrange(w00, w11)
+                    ):
                         subbulksize += _bulk.bulksizebyte * (
                             (c11 - c00 + 1)
                             * (b00 - b11 + 1)
                             * (h00 - h11 + 1)
                             * (w00 - w11 + 1)
                             * 1.0
-                            / ((_bulk.bulkscratch["B"][1] - _bulk.bulkscratch["B"][0] + 1)
-                                * (_bulk.bulkscratch["C"][1] - _bulk.bulkscratch["C"][0] + 1)
-                                * (_bulk.bulkscratch["H"][1] - _bulk.bulkscratch["H"][0] + 1)
-                                * (_bulk.bulkscratch["W"][1] - _bulk.bulkscratch["W"][0] + 1)
+                            / (
+                                (
+                                    _bulk.bulkscratch["B"][1]
+                                    - _bulk.bulkscratch["B"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["C"][1]
+                                    - _bulk.bulkscratch["C"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["H"][1]
+                                    - _bulk.bulkscratch["H"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["W"][1]
+                                    - _bulk.bulkscratch["W"][0]
+                                    + 1
+                                )
                             )
                         )
             elif _bulk.datatype == "VEC":
@@ -150,19 +182,32 @@ class Scratchpad:
                 for bulknote in self.Scratchpad[note]["bulknotelist"]:
                     blist.append(bulknote.scratchdict["B"])
                     mlist.append(bulknote.scratchdict["M"])
-                bmlist = list(zip(blist, mlist))  
+                bmlist = list(zip(blist, mlist))
                 bmlist.sort(key=takeone, reverse=False)
                 subbulksize = 0
                 for bmtup in bmlist:
-                    b00, b11 = check_range(_bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bmtup[0])
-                    m00, m11 = check_range(_bulk.bulkscratch["M"][0], _bulk.bulkscratch["M"][1], bmtup[1])
+                    b00, b11 = check_range(
+                        _bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bmtup[0]
+                    )
+                    m00, m11 = check_range(
+                        _bulk.bulkscratch["M"][0], _bulk.bulkscratch["M"][1], bmtup[1]
+                    )
                     if isrange(b00, b11) and isrange(m00, m11):
                         subbulksize += _bulk.bulksizebyte * (
                             (m11 - m00 + 1)
                             * (b00 - b11 + 1)
                             * 1.0
-                            / ((_bulk.bulkscratch["B"][1] - _bulk.bulkscratch["B"][0] + 1)
-                                * (_bulk.bulkscratch["M"][1] - _bulk.bulkscratch["M"][0] + 1)
+                            / (
+                                (
+                                    _bulk.bulkscratch["B"][1]
+                                    - _bulk.bulkscratch["B"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["M"][1]
+                                    - _bulk.bulkscratch["M"][0]
+                                    + 1
+                                )
                             )
                         )
             elif _bulk.datatype == "MAT":
@@ -173,33 +218,57 @@ class Scratchpad:
                     blist.append(bulknote.scratchdict["B"])
                     mlist.append(bulknote.scratchdict["M"])
                     nlist.append(bulknote.scratchdict["N"])
-                bmnlist = list(zip(blist, mlist))  
+                bmnlist = list(zip(blist, mlist))
                 bmnlist.sort(key=takeone, reverse=False)
                 subbulksize = 0
                 for bmntup in bmnlist:
-                    b00, b11 = check_range(_bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bmntup[0])
-                    m00, m11 = check_range(_bulk.bulkscratch["M"][0], _bulk.bulkscratch["M"][1], bmntup[1])
-                    n00, n11 = check_range(_bulk.bulkscratch["N"][0], _bulk.bulkscratch["N"][1], bmntup[2])
+                    b00, b11 = check_range(
+                        _bulk.bulkscratch["B"][0], _bulk.bulkscratch["B"][1], bmntup[0]
+                    )
+                    m00, m11 = check_range(
+                        _bulk.bulkscratch["M"][0], _bulk.bulkscratch["M"][1], bmntup[1]
+                    )
+                    n00, n11 = check_range(
+                        _bulk.bulkscratch["N"][0], _bulk.bulkscratch["N"][1], bmntup[2]
+                    )
                     if isrange(b00, b11) and isrange(m00, m11) and isrange(n00, n11):
                         subbulksize += _bulk.bulksizebyte * (
                             (m11 - m00 + 1)
                             * (b00 - b11 + 1)
                             * (n00 - n11 + 1)
                             * 1.0
-                            / ((_bulk.bulkscratch["B"][1] - _bulk.bulkscratch["B"][0] + 1)
-                                * (_bulk.bulkscratch["M"][1] - _bulk.bulkscratch["M"][0] + 1)
-                                * (_bulk.bulkscratch["N"][1] - _bulk.bulkscratch["N"][0] + 1)
+                            / (
+                                (
+                                    _bulk.bulkscratch["B"][1]
+                                    - _bulk.bulkscratch["B"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["M"][1]
+                                    - _bulk.bulkscratch["M"][0]
+                                    + 1
+                                )
+                                * (
+                                    _bulk.bulkscratch["N"][1]
+                                    - _bulk.bulkscratch["N"][0]
+                                    + 1
+                                )
                             )
                         )
 
             return subbulksize
-
 
     def readANote(self, _bulk: DataBulk):
         if check_scratchpad(_bulk) > 0:
             return "Success"
         else:
             return "Fail"
+
+    def get_size(self, _note):
+        if _note in self.Scratchpad:
+            return self.Scratchpad[_note]["sizebyte"]
+        else:
+            return 0
 
     def delANote(self, _note):
         assert _note in self.Scratchpad
@@ -249,8 +318,8 @@ class Memonitor:
         self.monitor[_newnote] = copy.deepcopy(_note)
         del self.monitor[_note]
 
-    # hookfunc of monitor
-    # ======================================================================================
+    # hookfunc
+    # ================================================================================
     def monitor_hook0(self, _note, _token, _worf: ClusterComponent):
         # add token, a global method
         self.monitor[_note] = {}

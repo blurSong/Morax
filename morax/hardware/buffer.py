@@ -109,9 +109,10 @@ class ScratchpadBuffer:
 
     def read_buffer(self, _databulk: DataBulk) -> str:
         return self.Scratchpad.readANote(_databulk)
-    
-    def release(self, note):
-        
+
+    def release(self, _note):
+        self.WaterLineByte -= self.Scratchpad.get_size(_note)
+        self.Scratchpad.delANote(_note)
 
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution
