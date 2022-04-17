@@ -3,6 +3,7 @@ from morax.system.config import MoraxConfig, HWParam
 from morax.system.query import QueryRingBus, QueryDMA
 import copy
 from morax.system.interface import *
+import numpy as np
 
 
 def edit_data_index(_thisidx, _thatidx, datatype):
@@ -37,7 +38,8 @@ def isrange(c0, c1):
 | [modelname + layerindex + datatype] |
 |-------------------------------------|
 | sizebyte                            |              
-| # token                             |
+| datatype                            |
+| note scratchdict                    | # added 0417
 |-------------------------------------|
 | bulklabel1 | sizebyte | scratchdict |
 | bulklabel2 | sizebyte | scratchdict |
@@ -48,7 +50,7 @@ def isrange(c0, c1):
 
 class bulknote:
     def __init__(self, _databulk: DataBulk) -> None:
-        self.bulklabel = _databulk.bulklabel
+        self.bulklabel = _databulk.bulklabel 
         self.sizebyte = _databulk.bulksizebyte
         self.scratchdict = _databulk.bulkscratch
 
@@ -72,11 +74,22 @@ class Scratchpad:
         else:
             pad = {}
             pad["sizebyte"] = _bulk.bulksizebyte
+            pad['datatype'] = _bulk.datatype
             abulknote = bulknote(_bulk)
             pad["bulknotelist"] = [abulknote]
             # pad["token"] = _bulk.token
             self.Scratchpad[note] = copy.deepcopy(pad)
 
+    def merge_scratchpad(self, _note):
+        for bulknote in self.Scratchpad[_note]["bulknotelist"]:
+        dtype =  self.Scratchpad[_note]['datatype']
+        scratchpad_dict = {}
+        if dtype == 'WET':
+            # KCRS = np.zeros()
+            
+
+
+        
     def check_scratchpad(self, _bulk: DataBulk):
         # return subbulk size only
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
@@ -318,19 +331,23 @@ class Memonitor:
         self.monitor[_newnote] = copy.deepcopy(_note)
         del self.monitor[_note]
 
+    """
     # hookfunc
     # ================================================================================
-    def monitor_hook0(self, _note, _token, _worf: ClusterComponent):
-        # add token, a global method
+    # 0417 update hooks
+    """
+
+    # make output note, a global method
+    def hook0_ini(self, _note, _token, _worf):
         self.monitor[_note] = {}
         self.monitor[_note]["token"] = _token
         self.monitor[_note]["worf"] = _worf
         self.monitor[_note]["loclist"] = []
 
-    def monitor_hook1(
+    # hook1, check before read
+    def hook1_cbr(
         self, _clusterid: int, _bulk: DataBulk, _clusterlist: list,
     ):
-        # hook1, check before read
         ExtraQueryList = []
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         worf = self.monitor[note]["worf"]
@@ -371,26 +388,28 @@ class Memonitor:
                     self.insert_note(note, _clusterid)
         return ExtraQueryList
 
-    def monitor_hook2(
+    # hook2, check before write
+    def hook2_cbw(
         self, _clusterid: int, _bulk: DataBulk, _clusterlist: list,
-    ):  # hook2, check before write
+    ):
         ExtraQueryList = []
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         # assert _worf == ClusterComponent.FeatureBuffer:
         return ExtraQueryList
 
-    def monitor_hook3(
-        self, modelname, layerindex, datatype, _clusterlist: list,
-    ):  # hook3, check after one layer finish
-        note = modelname + "_" + str(layerindex) + "_" + datatype
-        self.monitor[note]["token"] -= 1
-        if self.monitor[note]["token"] == 0:
-            worf = self.monitor[note]["worf"]
-            _, loclist = self.search_note(note)
+    # hook3, check input after one layer finish
+    def hook3_caf(
+        self, _note, _clusterlist: list,
+    ):
+        # note = modelname + "_" + str(layerindex) + "_" + datatype
+        self.monitor[_note]["token"] -= 1
+        if self.monitor[_note]["token"] == 0:
+            worf = self.monitor[_note]["worf"]
+            _, loclist = self.search_note(_note)
             for loc in loclist:
                 if worf == ClusterComponent.WeightBuffer:
-                    _clusterlist[loc].WeightBuffer.release(note)
+                    _clusterlist[loc].WeightBuffer.release(_note)
                 elif worf == ClusterComponent.FeatureBuffer:
-                    _clusterlist[loc].FeatureBuffer.release(note)
+                    _clusterlist[loc].FeatureBuffer.release(_note)
             self.eliminate_note(note)
 

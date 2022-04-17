@@ -227,6 +227,7 @@ class LayerQuery:
         self.iodegree = {"in": _indegree, "out": _outdegree}
         self.subquerynum = 0
         self.SubQueryList = []
+        self.FINISHED_FLAG = False
 
         # assignment: listoftuple_clstid_nvtcid_sliceidlist
         # default []
@@ -410,15 +411,19 @@ def compileRRAM(
                         if tup[0] not in bulkinfo:
                             bulkinfo.append(tup[0])
                     # make query
-                    datatype = "FTR" if layertype == LLT.Linear else "VEC"
+                    datatype = (
+                        "FTR"
+                        if (layertype == LLT.Linear and _layerclass.is_fc)
+                        else "VEC"
+                    )
                     bulkscratch = {}
                     taskindex += 1
                     bulkscratch["B"] = bat
-                    if mxLTD[layertype] == "Linear":
-                        bulkscratch["HW"] = ALL
+                    if datatype == "FTR":
+                        bulkscratch["H"] = 0
+                        bulkscratch["W"] = 0
                         rowpart = "C"
                     else:
-                        bulkscratch["N"] = ALL
                         rowpart = "M"
                     bulkscratch[rowpart] = []
                     bs = 0
@@ -428,9 +433,9 @@ def compileRRAM(
                         else:
                             bs += MoraxConfig.RRAMXbarSize
                     bulkscratch[rowpart].append(inf)
-                    bs = bs * MoraxConfig.PrecisionBits / 8
+                    bsize = bs * MoraxConfig.PrecisionBits / 8
                     bulk = DataBulk(
-                        _modelname, _index + +IIleft, datatype, bs, bulkscratch
+                        _modelname, _index + +IIleft, datatype, bsize, bulkscratch
                     )
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
                     tasklabel = make_tasklabel(
@@ -456,24 +461,26 @@ def compileRRAM(
                 (M, _layerclass.col_dim),
             )
             SubQueryList.append(copy.deepcopy(qv))
+            """
             if mxLTD[layertype] == "Linear":
                 bulk = DataBulk(
                     _modelname,
                     _index,
                     "FTR",
                     _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
-                    {"B": bat, "HW": ALL, "C": ALL},
+                    {"B": (bat, bat), "HW": ALL, "C": ALL},
                     token,
                 )
             else:
-                bulk = DataBulk(
-                    _modelname,
-                    _index,
-                    "VEC",
-                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
-                    {"B": bat, "M": ALL, "N": ALL},
-                    token,
-                )
+            """
+            bulk = DataBulk(
+                _modelname,
+                _index,
+                "VEC",
+                _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                {"B": bat, "M": (0, _layerclass.col_dim - 1)},
+                token,
+            )
             qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
             SubQueryList.append(copy.deepcopy(qw))
         # End for
@@ -502,25 +509,29 @@ def compileRRAM(
                     datatype = "FTR"
                     bulkscratch = {}
                     bulkscratch["B"] = bat
-                    bulkscratch["HW"] = col_iter + row_iter * omapsize
-                    bulkscratch["C"] = ALL
-                    bs = (
+                    bulkscratch["W"] = (col_iter, col_iter + _layerclass.kernel_size)
+                    bulkscratch["H"] = (row_iter, row_iter + _layerclass.kernel_size)
+                    if IIright != 0:
+                        bulkscratch["C"] = (0, _layerclass.in_channel / 2)
+                    else:
+                        bulkscratch["C"] = (0, _layerclass.in_channel)
+                    bsize = (
                         _layerclass.kernel_size
                         * _layerclass.in_channel
                         * MoraxConfig.PrecisionBits
                         / 8
                     )
-                    bs *= (
+                    bsize *= (
                         _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
                     )
                     bulk = DataBulk(
-                        _modelname, _index + IIleft, datatype, bs, bulkscratch
+                        _modelname, _index + IIleft, datatype, bsize, bulkscratch
                     )
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
                     SubQueryList.append(copy.deepcopy(qr))
                     if IIright != 0:
                         bulk2 = DataBulk(
-                            _modelname, _index + IIright, datatype, bs, bulkscratch
+                            _modelname, _index + IIright, datatype, bsize, bulkscratch
                         )
                         qr2 = QueryBuffer(
                             bulk2, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
@@ -558,15 +569,20 @@ def compileRRAM(
                     )
                     SubQueryList.append(copy.deepcopy(qv))
                     # make writeback bulk
-                    bulk = DataBulk(
+                    wbscratch = {}
+                    wbscratch["B"] = bat
+                    wbscratch["H"] = row_iter
+                    wbscratch["W"] = col_iter
+                    wbscratch["C"] = (0, _layerclass.out_channel)
+                    wbbulk = DataBulk(
                         _modelname,
                         _index,
                         "FTR",
                         _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": ALL},
+                        wbscratch,
                         token,
                     )
-                    qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+                    qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
 

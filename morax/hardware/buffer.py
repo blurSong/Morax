@@ -28,7 +28,7 @@ from morax.system.memonitor import Scratchpad
     layerindex: int
     datatype: str (WET or FTR or VEC or MAT)
     bulksizeByte: int
-    bulkscratch tuple, (begin, end)
+    bulkscratch: tuple(begin, end) or int
     K:           B:          B:           B:
     C:           C:          M:           M:
     R:           H:                       N:
@@ -40,10 +40,11 @@ from morax.system.memonitor import Scratchpad
 """
 
 
-def make_bulklabel(mn, li, bs, bsd: dict, datatype: str):
-    assert datatype in ["WET", "FTR"]
+def make_bulklabel(mn, li, bsz, bsd: dict, datatype: str):
+    assert datatype in ["WET", "FTR", "VEC", "MAT"]
     bulkform = str()
-    for key, val in bsd.item():
+    for key, tup in bsd.item():
+        """
         if isinstance(val, list):
             bulkform += "_" + key + "_".join(val)
         else:
@@ -51,7 +52,12 @@ def make_bulklabel(mn, li, bs, bsd: dict, datatype: str):
                 bulkform += "_" + key + "ALL"
             else:
                 bulkform += "_" + key + str(val)
-    return mn + "_L" + str(li) + "_" + datatype + "_" + str(bs) + bulkform
+        """
+        if isinstance(tup, tuple):
+            bulkform += "_" + key + str(tup[0]) + "-" + str(tup[1])
+        else:
+            bulkform += "_" + key + str(tup)
+    return mn + "_L" + str(li) + "_" + datatype + "_" + str(bsz) + bulkform
 
 
 class DataBulk:
