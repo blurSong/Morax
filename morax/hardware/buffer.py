@@ -29,10 +29,10 @@ from morax.system.memonitor import Scratchpad
     datatype: str (WET or FTR or VEC or MAT)
     bulksizeByte: int
     bulkscratch: tuple(begin, end) or int
-    K:           B:          B:           B:
-    C:           C:          M:           M:
-    R:           H:                       N:
-    S:           W:
+    K:  outc    B:          B:           B:
+    C:  inc     C:          M:           M:
+    RS:         H:                       N:
+                W:
     bulklabel: str
 
 
