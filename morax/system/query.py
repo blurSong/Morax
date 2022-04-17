@@ -425,15 +425,25 @@ def compileRRAM(
                         rowpart = "C"
                     else:
                         rowpart = "M"
-                    bulkscratch[rowpart] = []
-                    bs = 0
+                    bsize = 0
+                    fst, lst = bulkinfo[0], bulkinfo[0]
                     for inf in bulkinfo:
                         if inf == M and M_tail > 0:
-                            bs += M_tail
+                            bsize += M_tail
                         else:
-                            bs += MoraxConfig.RRAMXbarSize
-                    bulkscratch[rowpart].append(inf)
-                    bsize = bs * MoraxConfig.PrecisionBits / 8
+                            bsize += MoraxConfig.RRAMXbarSize
+                        fst = inf if inf < fst else fst
+                        lst = inf if lst < inf else lst
+                    last = (
+                        (lst + 1) * MoraxConfig.RRAMXbarSize - 1
+                        if lst != M
+                        else _layerclass.row_dim
+                    )
+                    bulkscratch[rowpart] = (
+                        fst * MoraxConfig.RRAMXbarSize,
+                        last,
+                    )
+                    bsize = bsize * MoraxConfig.PrecisionBits / 8
                     bulk = DataBulk(
                         _modelname, _index + +IIleft, datatype, bsize, bulkscratch
                     )
@@ -512,9 +522,9 @@ def compileRRAM(
                     bulkscratch["W"] = (col_iter, col_iter + _layerclass.kernel_size)
                     bulkscratch["H"] = (row_iter, row_iter + _layerclass.kernel_size)
                     if IIright != 0:
-                        bulkscratch["C"] = (0, _layerclass.in_channel / 2)
+                        bulkscratch["C"] = (0, _layerclass.in_channel / 2 - 1)
                     else:
-                        bulkscratch["C"] = (0, _layerclass.in_channel)
+                        bulkscratch["C"] = (0, _layerclass.in_channel - 1)
                     bsize = (
                         _layerclass.kernel_size
                         * _layerclass.in_channel
@@ -617,17 +627,16 @@ def compileRRAM(
                         == 0
                         and col_iter % _layerclass.stride == 0
                     ):
-                        # make simple bulk
+                        # make simple bulk is have new data in window
                         datatype = "FTR"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
-                        bulkscratch["HW"] = (col_iter / _layerclass.stride - 1) + (
-                            row_iter / _layerclass.stride - 1
-                        ) * _layerclass.feature_size
-                        bulkscratch["C"] = ALL
-                        bs = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                        bulkscratch["W"] = col_iter / _layerclass.stride - 1
+                        bulkscratch["H"] = row_iter / _layerclass.stride - 1
+                        bulkscratch["C"] = (0, _layerclass.in_channel - 1)
+                        bsize = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(
-                            _modelname, _index + IIleft, datatype, bs, bulkscratch
+                            _modelname, _index + IIleft, datatype, bsize, bulkscratch
                         )
                         qr = QueryBuffer(
                             bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
@@ -665,15 +674,20 @@ def compileRRAM(
                     )
                     SubQueryList.append(copy.deepcopy(qv))
                     # make writeback bulk
-                    bulk = DataBulk(
+                    wbscratch = {}
+                    wbscratch["B"] = bat
+                    wbscratch["H"] = row_iter
+                    wbscratch["W"] = col_iter
+                    wbscratch["C"] = (0, _layerclass.out_channel)
+                    wbbulk = DataBulk(
                         _modelname,
                         _index,
                         "FTR",
                         _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "HW": col_iter + row_iter * omapsize, "C": ALL},
+                        wbscratch,
                         token,
                     )
-                    qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+                    qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
 
@@ -699,7 +713,8 @@ def compileRRAM(
         ) / MoraxConfig.RRAMXbarSize
         rram_taskindex = -1
         vpu_taskindex = -1
-
+        group_inchannel = _layerclass.in_channel / _layerclass.group
+        group_outchannel = _layerclass.out_channel / _layerclass.group
         for bat in range(_batch):
             for grp in range(_layerclass.group):
                 omapsize = _layerclass.feature_size / _layerclass.stride
@@ -709,21 +724,30 @@ def compileRRAM(
                         datatype = "FTR"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
-                        bulkscratch["HW"] = col_iter + row_iter * omapsize
-                        bulkscratch["C"] = grp
-                        bs = (
-                            _layerclass.kernel_size
-                            * _layerclass.in_channel
-                            * (MoraxConfig.PrecisionBits / 8)
-                            / _layerclass.group
+                        bulkscratch["W"] = (
+                            col_iter,
+                            col_iter + _layerclass.kernel_size,
                         )
-                        bs *= (
+                        bulkscratch["H"] = (
+                            row_iter,
+                            row_iter + _layerclass.kernel_size,
+                        )
+                        bulkscratch["C"] = (
+                            grp * group_inchannel,
+                            (grp + 1) * group_inchannel - 1,
+                        )
+                        bsize = (
+                            _layerclass.kernel_size
+                            * group_inchannel
+                            * (MoraxConfig.PrecisionBits / 8)
+                        )
+                        bsize *= (
                             _layerclass.kernel_size
                             if col_iter == 0
                             else _layerclass.stride
                         )
                         bulk = DataBulk(
-                            _modelname, _index + IIleft, datatype, bs, bulkscratch
+                            _modelname, _index + IIleft, datatype, bsize, bulkscratch
                         )
                         qr = QueryBuffer(
                             bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
@@ -756,18 +780,24 @@ def compileRRAM(
                             vtasklabel,
                             "PostProcess",
                             LLT.NGCONV,
-                            (M, _layerclass.out_channel / _layerclass.group),
+                            (M, group_outchannel),
                         )
                         SubQueryList.append(copy.deepcopy(qv))
                         # make writeback bulk
-                        bulk = DataBulk(
+                        wbscratch = {}
+                        wbscratch["B"] = bat
+                        wbscratch["H"] = row_iter
+                        wbscratch["W"] = col_iter
+                        wbscratch["C"] = (
+                            grp * group_outchannel,
+                            (grp + 1) * group_outchannel - 1,
+                        )
+                        wbbulk = DataBulk(
                             _modelname,
                             _index,
                             "FTR",
-                            _layerclass.out_channel
-                            / _layerclass.group
-                            * (MoraxConfig.PrecisionBits / 8),
-                            {"B": bat, "HW": col_iter + row_iter * omapsize, "C": grp},
+                            group_outchannel * (MoraxConfig.PrecisionBits / 8),
+                            wbscratch,
                             token,
                         )
                         qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
@@ -775,6 +805,14 @@ def compileRRAM(
         # End for
 
     if layertype == LLT.GEMM:
+        """
+              =========       =========
+        vdim  =========   *   =========   rowdim
+              =========       =========
+                              =========
+                              coldim
+        """
+
         # idxtup = _layerclass.input_indecies_tuple
         if IIright == 0:
             iidx = IIleft
@@ -790,7 +828,7 @@ def compileRRAM(
         N = math.ceil(col_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         M_tail = row_dim % MoraxConfig.RRAMXbarSize
         N_tail = col_dim % MoraxConfig.RRAMXbarSize
-        # assume fetch batch is 8
+        # assume fetch batch is 16 = NVTCNUM/2
         vfetch = 16
         V = math.ceil(v_dim * 1.0 / vfetch)
         rram_taskindex = -1
@@ -812,22 +850,33 @@ def compileRRAM(
                         for tup in mapinfo:
                             if tup[0] not in bulkinfo:
                                 bulkinfo.append(tup[0])
-                        # make query
+                        # make input matrix v * row query
                         datatype = "MAT"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
                         bulkscratch["M"] = vf
-                        bulkscratch["N"] = []
-                        bs = 0
+                        # bulkscratch["N"] = []
+                        bsize = 0
+                        fst, lst = bulkinfo[0], bulkinfo[0]
                         for inf in bulkinfo:
                             if inf == M and M_tail > 0:
-                                bs += M_tail
+                                bsize += M_tail
                             else:
-                                bs += MoraxConfig.RRAMXbarSize
-                        bulkscratch["N"].append(inf)
-                        bs = vfetch * bs * MoraxConfig.PrecisionBits / 8
+                                bsize += MoraxConfig.RRAMXbarSize
+                            fst = inf if inf < fst else fst
+                            lst = inf if lst < inf else lst
+                        last = (
+                            (lst + 1) * MoraxConfig.RRAMXbarSize - 1
+                            if lst != M
+                            else row_dim
+                        )
+                        bulkscratch["N"] = (
+                            fst * MoraxConfig.RRAMXbarSize,
+                            last,
+                        )
+                        bsize = vfetch * bsize * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(
-                            _modelname, _index + iidx, datatype, bs, bulkscratch
+                            _modelname, _index + iidx, datatype, bsize, bulkscratch
                         )
                         qr = QueryBuffer(
                             bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
@@ -853,25 +902,21 @@ def compileRRAM(
                             SubQueryList.append(copy.deepcopy(qe))
                     vpu_taskindex += 1
                     vtasklabel = make_tasklabel(
-                        _modelname, vpu_taskindex, 0, "PostProcess"
+                        _modelname, _index, vpu_taskindex, "PostProcess"
                     )
                     qv = QueryExcuteOnVPU(
-                        _layerclass,
-                        vtasklabel,
-                        "PostProcess",
-                        LLT.GEMM,
-                        (M, _layerclass.col_dim),
+                        _layerclass, vtasklabel, "PostProcess", LLT.GEMM, (M, col_dim),
                     )
                     SubQueryList.append(copy.deepcopy(qv))
-                    bulk = DataBulk(
+                    wbbulk = DataBulk(
                         _modelname,
                         _index,
                         "MAT",
-                        _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
-                        {"B": bat, "M": line, "N": ALL},
+                        col_dim * MoraxConfig.PrecisionBits / 8,
+                        {"B": bat, "M": line, "N": (0, col_dim - 1)},
                         token,
                     )
-                    qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
+                    qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
             # End for
     return SubQueryList
