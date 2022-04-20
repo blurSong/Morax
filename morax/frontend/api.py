@@ -19,7 +19,7 @@ from morax.frontend.csvparser import apdidx2_is_index2
 from morax.model.layer import mxLCD_CNN, mxLCD_GEMM, mxLTD, mxNTD
 
 
-def get_lookup_adress(_modelname, _index, _chn):
+def get_lookup_adress(_index, _chn):
     # NOTE fake func because no real data
     return (1, 1, [2, 3])
 

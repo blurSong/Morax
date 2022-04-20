@@ -2382,7 +2382,8 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 datatype = "FTR"
                 fbulkscratch = {}
                 fbulkscratch["B"] = bat
-                fbulkscratch["HW"] = ALL
+                fbulkscratch["H"] = (0, _layerclass.feature_size - 1)
+                fbulkscratch["W"] = (0, _layerclass.feature_size - 1)
                 fbulkscratch["C"] = ch
                 fbs = _layerclass.feature_size ** 2 * MoraxConfig.PrecisionBits / 8
                 fbulk = DataBulk(
@@ -2403,7 +2404,13 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 SubQueryList.append(copy.deepcopy(qv))
                 # wb
                 wbs = ofsize ** 2 * MoraxConfig.PrecisionBits / 8
-                wbbulk = DataBulk(_modelname, _index, datatype, wbs, fbulkscratch,)
+                wbulkscratch = {
+                    "B": bat,
+                    "C": ch,
+                    "H": (0, ofsize - 1),
+                    "W": (0, ofsize - 1),
+                }
+                wbbulk = DataBulk(_modelname, _index, datatype, wbs, wbulkscratch,)
                 qwb = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qwb))
         # End for
@@ -2415,17 +2422,21 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
         for bat in range(B):
             for line in range(L):
                 # read
-                datatype = "VEC" if layertype == NLT.Softmax1D else "MAT"
                 rbulkscratch = {}
                 rbulkscratch["B"] = bat
-                rbulkscratch["M"] = line if layertype == NLT.Softmax2D else ALL
-                rbulkscratch["N"] = ALL
-                rbs = V * MoraxConfig.PrecisionBits / 8
+                if layertype == NLT.Softmax2D:
+                    datatype = "MAT"
+                    rbulkscratch["M"] = line
+                    rbulkscratch["N"] = (0, V)
+                elif layertype == NLT.Softmax1D:
+                    datatype = "VEC"
+                    rbulkscratch["M"] = (0, V)
+                rbsize = V * MoraxConfig.PrecisionBits / 8
                 rbulk = DataBulk(
                     _modelname,
                     _index + _layerclass.input_indecies_tuple[0],
                     datatype,
-                    rbs,
+                    rbsize,
                     rbulkscratch,
                 )
                 qr = QueryBuffer(rbulk, BO.Read, CC.FeatureBuffer, CC.VPU)
@@ -2446,13 +2457,13 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                     _layerclass, stasklabel, "UpStream", SO.Truncation,
                 )
                 SubQueryList.append(copy.deepcopy(qsmu))
-                # exp lut
+                # exp lookup
                 for v in range(V):
                     lut_taskindex += 1
                     luttasklabel = make_tasklabel(
                         _modelname, _index, lut_taskindex, mxLTD[layertype]
                     )
-                    lutadress = get_lookup_adress(_modelname, _index, line)
+                    lutadress = get_lookup_adress(_index, line)
                     qlut = QueryExcuteOnNVTC(
                         _layerclass,
                         luttasklabel,
@@ -2469,7 +2480,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 luttasklabel = make_tasklabel(
                     _modelname, _index, lut_taskindex, mxLTD[layertype]
                 )
-                lutadress = get_lookup_adress(_modelname, _index, line)
+                lutadress = get_lookup_adress(_index, line)
                 qlut = QueryExcuteOnNVTC(
                     _layerclass,
                     luttasklabel,
@@ -2488,11 +2499,10 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Softmax", SO.VNORM,)
                 SubQueryList.append(copy.deepcopy(qv))
                 # write
-                wbulk = DataBulk(_modelname, _index, datatype, rbs, rbulkscratch,)
+                wbulk = DataBulk(_modelname, _index, datatype, rbsize, rbulkscratch,)
                 qw = QueryBuffer(wbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
         # Eno for
-
     return SubQueryList
 
 
