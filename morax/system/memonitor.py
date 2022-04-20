@@ -48,9 +48,9 @@ def isrange(c0, c1):
 """
 
 
-class bulknote:
+class BulkNote:
     def __init__(self, _databulk: DataBulk) -> None:
-        self.bulklabel = _databulk.bulklabel 
+        self.bulklabel = _databulk.bulklabel
         self.sizebyte = _databulk.bulksizebyte
         self.scratchdict = _databulk.bulkscratch
 
@@ -66,30 +66,64 @@ class Scratchpad:
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         if note in self.Scratchpad:
             self.Scratchpad[note]["sizebyte"] += _bulk.bulksizebyte
-            abulknote = bulknote(_bulk)
-            if abulknote not in self.Scratchpad[note]["bulknotelist"]:
-                self.Scratchpad[note]["bulknotelist"].append(copy.deepcopy(abulknote))
+            bulknote = BulkNote(_bulk)
+            if bulknote not in self.Scratchpad[note]["bulknotelist"]:
+                self.Scratchpad[note]["bulknotelist"].append(copy.deepcopy(bulknote))
             # assert self.Scratchpad[note]["token"] == _bulk.token
             # NOTE token is maintained in monitor
         else:
             pad = {}
             pad["sizebyte"] = _bulk.bulksizebyte
-            pad['datatype'] = _bulk.datatype
+            pad["datatype"] = _bulk.datatype
             abulknote = bulknote(_bulk)
             pad["bulknotelist"] = [abulknote]
             # pad["token"] = _bulk.token
             self.Scratchpad[note] = copy.deepcopy(pad)
 
-    def merge_scratchpad(self, _note):
-        for bulknote in self.Scratchpad[_note]["bulknotelist"]:
-        dtype =  self.Scratchpad[_note]['datatype']
+    def before_or_after(tup1, tup2):
+        if 
+
+    def merge_scratchpad(self, _note, _fullsize):
+        datatype = self.Scratchpad[_note]["datatype"]
         scratchpad_dict = {}
-        if dtype == 'WET':
-            # KCRS = np.zeros()
-            
+        clist, hwdict = [], {}
+        if datatype == "WET":
+            return
+            # KCRS, Usually No need to merge
+        elif datatype == "FTR":
+            # BCHW: OS HWtupBintCinttup  RRAM or Sys BHWintCtup
+            for bulknote in self.Scratchpad[_note]["bulknotelist"]:
+                b, c, h, w = (
+                    bulknote.scratchdict["B"],
+                    bulknote.scratchdict["C"],
+                    bulknote.scratchdict["H"],
+                    bulknote.scratchdict["W"],
+                )
+                if (
+                    isinstance(b, int)
+                    and isinstance(c, (int, tuple))
+                    and isinstance(h, tuple)
+                    and isinstance(w, tuple)
+                ):
+                    if isinstance(c, tuple):
+                        for cidx in range(len(c)):
+                            if cidx != 0 and cidx != len(c) - 1:
+                                assert c[cidx] not in clist
+                                clist.append(c[cidx])
+                                hwdict[c[cidx]] = ((0, _fullsize), (0, _fullsize))
+                            elif cidx == 0:
+                                
+                                
 
 
-        
+
+                elif:(
+                    isinstance(b, int)
+                    and isinstance(c, tuple)
+                    and isinstance(h, int)
+                    and isinstance(w, int)
+                ):
+
     def check_scratchpad(self, _bulk: DataBulk):
         # return subbulk size only
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
@@ -298,14 +332,6 @@ class Memonitor:
         self.monitor = {}
 
     def insert_note(self, _note: str, _location: int):
-        """
-        if _note not in self.monitor:
-            self.monitor[_note]["loclist"] = [_location]
-            # self.monitor[_note]["token"] = _token
-            assert _location in range(self.scratchpadnum)  # -1 for offchip (depr)
-        else:
-            # assert _token == self.monitor[_note]["token"]
-        """
         self.monitor[_note]["loclist"].append(_location)
 
     def transfer_note(self, _note, _from, _to):
