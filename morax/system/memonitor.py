@@ -1,17 +1,20 @@
 from morax.hardware.buffer import DataBulk
+from morax.model.layer import LinearLayerType, NonlinearLayerType
 from morax.system.config import MoraxConfig, HWParam
 from morax.system.query import QueryRingBus, QueryDMA
 import copy
 from morax.system.interface import *
 import numpy as np
+from morax.frontend.api import (
+    get_layer_scratchdict,
+    get_datatype,
+    get_weight_scratchdict,
+    get_weight_datatype,
+)
 
 
 def edit_data_index(_thisidx, _thatidx, datatype):
     # for concat or append
-    return
-
-
-def check_scratchpad():
     return
 
 
@@ -39,7 +42,7 @@ def isrange(c0, c1):
 |-------------------------------------|
 | sizebyte                            |              
 | datatype                            |
-| note scratchdict                    | # added 0417
+| total_scratchdict                   | # added 0417
 |-------------------------------------|
 | bulklabel1 | sizebyte | scratchdict |
 | bulklabel2 | sizebyte | scratchdict |
@@ -77,16 +80,36 @@ class Scratchpad:
             pad["datatype"] = _bulk.datatype
             abulknote = bulknote(_bulk)
             pad["bulknotelist"] = [abulknote]
-            # pad["token"] = _bulk.token
             self.Scratchpad[note] = copy.deepcopy(pad)
 
-    def before_or_after(tup1, tup2):
-        if 
+    def merge_2scratch(_hw1, _hw2):
+        htup1 = _hw1[0]
+        htup2 = _hw2[0]
+        wtup1 = _hw1[1]
+        wtup2 = _hw2[1]
+        hw = []
+        if abs(htup1[1] - htup2[0]) < MoraxConfig.PEArraySize:
+            hw[0] = (htup1[0], htup2[1])
+        elif abs(htup1[0] - htup2[1]) < MoraxConfig.PEArraySize:
+            hw[0] = (htup2[0], htup1[1])
+        else:
+            print("merge scratc fatal")
+        if abs(wtup1[1] - wtup2[0]) < MoraxConfig.PEArraySize:
+            hw[0] = (wtup1[0], wtup2[1])
+        elif abs(wtup1[0] - wtup2[1]) < MoraxConfig.PEArraySize:
+            hw[0] = (wtup2[0], wtup1[1])
+        else:
+            print("merge scratc fatal")
+        return tuple(hw)
 
-    def merge_scratchpad(self, _note, _fullsize):
+    def merge_scratchpad(self, _note, _layer_scratchdict):
         datatype = self.Scratchpad[_note]["datatype"]
         scratchpad_dict = {}
-        clist, hwdict = [], {}
+        layersize_dict = {}
+        clist_os, hwdict_os = [], {}  # ((h, h), (w, w))
+        hwdict_rram = {}
+        blist_vec, vdict_vec = [], {}
+        blist_mat, mndict_mat = [], {}
         if datatype == "WET":
             return
             # KCRS, Usually No need to merge
@@ -104,27 +127,114 @@ class Scratchpad:
                     and isinstance(c, (int, tuple))
                     and isinstance(h, tuple)
                     and isinstance(w, tuple)
-                ):
+                ):  # _fullsize
+                    fullsize = _layer_scratchdict["H"]
                     if isinstance(c, tuple):
-                        for cidx in range(len(c)):
-                            if cidx != 0 and cidx != len(c) - 1:
-                                assert c[cidx] not in clist
-                                clist.append(c[cidx])
-                                hwdict[c[cidx]] = ((0, _fullsize), (0, _fullsize))
-                            elif cidx == 0:
-                                
-                                
-
-
-
-                elif:(
+                        for cidx in range(c[0], c[1] + 1):
+                            if cidx in clist_os:
+                                assert cidx == c[0]
+                                hwdict_os[cidx] = self.merge_2scratch(
+                                    hwdict_os[cidx], (h, w)
+                                )
+                            else:
+                                assert cidx != 0
+                                if cidx != c[1]:
+                                    clist_os.append(cidx)
+                                    hwdict_os[cidx] = ((0, fullsize), (0, fullsize))
+                                else:
+                                    clist_os.append(cidx)
+                                    hwdict_os[cidx] = ((0, h[1]), (0, w[1]))
+                    else:
+                        hwdict_os[c] = self.merge_2scratch(hwdict_os[c], (h, w))
+                elif (
                     isinstance(b, int)
                     and isinstance(c, tuple)
                     and isinstance(h, int)
                     and isinstance(w, int)
-                ):
+                ):  # _chsize
+                    chsize = _layer_scratchdict["C"]
+                    # if len(c) == _chsize:
+                    if c not in hwdict_rram:
+                        hwdict_rram[c] = ((h, h), (w, w))
+                    else:
+                        hwdict_rram[c] = self.merge_2scratch(hwdict_rram[c], (h, w))
+        elif datatype == "VEC":
+            for bulknote in self.Scratchpad[_note]["bulknotelist"]:
+                # B M
+                m = bulknote.scratchdict["M"]  # tup
+                b = bulknote.scratchdict["B"]  # int
+                if b not in blist_vec:
+                    blist_vec.append(b)
+                    vdict_vec[b] = m
+                else:
+                    if vdict_vec[b][0] > m[1]:
+                        vdict_vec[b] = (m[0], vdict_vec[b][1])
+                    elif vdict_vec[b][1] < m[0]:
+                        vdict_vec[b] = (vdict_vec[b][0], m[1])
+        elif datatype == "MAT":
+            for bulknote in self.Scratchpad[_note]["bulknotelist"]:
+                # B M N
+                m = bulknote.scratchdict["M"]  # tup
+                b = bulknote.scratchdict["B"]  # int
+                n = bulknote.scratchdict["N"]  # tup
+                if b not in blist_mat:
+                    blist_mat.append(b)
+                    mndict_mat[b] = (m, n)
+                else:
+                    mndict_mat[b] = self.merge_2scratch(mndict_mat[b], (m, n))
+        # End for
+        # make note dict
+        bsize = _layer_scratchdict["B"]
+        if datatype == "FTR":
+            if len(hwdict_os) != 0:
+                # clist_os, hwdict_os = [], {}
+                clist_os.sort()
+                scratchpad_dict["B"] = (0, bsize - 1)
+                scratchpad_dict["C"] = (clist_os[0], clist_os[-1])
+                scratchpad_dict["H"] = (
+                    hwdict_os[clist_os[0]][0][0],
+                    hwdict_os[clist_os[-1]][0][1],
+                )
+                scratchpad_dict["W"] = (
+                    hwdict_os[clist_os[0]][1][0],
+                    hwdict_os[clist_os[-1]][1][1],
+                )
+            elif len(hwdict_rram) != 0:
+                scratchpad_dict["B"] = (0, bsize - 1)
+                chs = list(hwdict_rram.keys())
+                if len(chs) == 1:
+                    scratchpad_dict["C"] = chs[0]
+                else:
+                    fsize = _layer_scratchdict["H"]
+                    chs.sort()
+                    scratchpad_dict["C"] = (chs[0][0], chs[-1][1])
+                    scratchpad_dict["H"] = (0, fsize - 1)  # hwdict_rram[chs[0]][0]
+                    scratchpad_dict["W"] = (0, fsize - 1)  # hwdict_rram[chs[0]][1]
+        elif datatype == "VEC":
+            vsize = _layer_scratchdict["M"]
+            blist_vec.sort()
+            scratchpad_dict["B"] = (blist_vec[0], blist_vec[-1])
+            scratchpad_dict["M"] = (0, vsize - 1)  # vdict_vec[blist_vec[0]]
+        elif datatype == "MAT":
+            msize = _layer_scratchdict["M"]
+            nsize = _layer_scratchdict["N"]
+            blist_mat.sort()
+            scratchpad_dict["B"] = (blist_mat[0], blist_mat[-1])
+            # scratchpad_dict['M'] = (0, msize-1)  # vdict_vec[blist_vec[0]]
+            # scratchpad_dict['N'] = (0, nsize-1)  # vdict_vec[blist_vec[0]]
+            scratchpad_dict["M"] = (
+                mndict_mat[blist_mat[0]][0][0],
+                mndict_mat[blist_mat[-1]][0][1],
+            )
+            scratchpad_dict["N"] = (
+                mndict_mat[blist_mat[0]][1][0],
+                mndict_mat[blist_mat[-1]][1][1],
+            )
+        self.Scratchpad[_note]["scratchpad_dict"] = copy.deepcopy(scratchpad_dict)
+        # self.Scratchpad[_note]['layersize_dict'] = copy.deepcopy(_layer_scratchdict)
+        return
 
-    def check_scratchpad(self, _bulk: DataBulk):
+    def check_scratchpad_deprecated(self, _bulk: DataBulk):
         # return subbulk size only
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         if note not in self.Scratchpad:
@@ -302,8 +412,106 @@ class Scratchpad:
                                 )
                             )
                         )
-
             return subbulksize
+
+    def check_scratchpad(self, _bulk: DataBulk):
+        # return subbulk size only
+        note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
+        if note not in self.Scratchpad:
+            return 0
+        else:
+            scratchpad_dict = self.Scratchpad[note]["scratchpad_dict"]
+            transmission_bulksize = 0
+            if _bulk.datatype == "WET":
+                ktup = _bulk.bulkscratch["K"]
+                ctup = _bulk.bulkscratch["C"]
+                if isinstance(ktup, tuple):
+                    klist = range(ktup[0], ktup[1] + 1)
+                else:
+                    klist = [ktup]
+                lenk = len(klist)
+                for kidx in klist:
+                    if (
+                        scratchpad_dict["K"][0] <= kidx
+                        and scratchpad_dict["K"][1] >= kidx
+                    ):
+                        # if scratchpad_dict['C'][0] <= ctup[0] and scratchpad_dict['C'][1] >= ctup[1]:
+                        if isrange(check_range(ctup[0], ctup[1], scratchpad_dict["C"])):
+                            transmission_bulksize += _bulk.bulksizebyte / lenk
+            elif _bulk.datatype == "FTR":
+                # BCHW
+                bint = _bulk.bulkscratch["B"]
+                ctup = _bulk.bulkscratch["C"]
+                htup = _bulk.bulkscratch["H"]
+                wtup = _bulk.bulkscratch["W"]
+                # assert isinstance(bint, int)
+                if isinstance(ctup, tuple):
+                    crange = check_range(ctup[0], ctup[1], scratchpad_dict["C"])
+                else:
+                    crange = check_range(ctup, ctup, scratchpad_dict["C"])
+                if scratchpad_dict["B"][0] <= bint and scratchpad_dict["B"][1] >= bint:
+                    if isrange(crange):
+                        ch0 = crange[0]
+                        ch1 = crange[1]
+                        entcnum = crange[1] - crange[0] + 1
+                        if ch0 == scratchpad_dict["C"][0]:
+                            entcnum -= 1
+                            hb0 = (
+                                htup[0]
+                                if htup[0] > scratchpad_dict["H"][0]
+                                else scratchpad_dict["H"][0]
+                            )
+                            transmission_bulksize += (
+                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
+                            ) * ((htup[1] - hb0 + 1) / (htup[1] - htup[0] + 1))
+                        if ch1 == scratchpad_dict["C"][1]:
+                            entcnum -= 1
+                            hb1 = (
+                                htup[1]
+                                if htup[1] < scratchpad_dict["H"][1]
+                                else scratchpad_dict["H"][1]
+                            )
+                            transmission_bulksize += (
+                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
+                            ) * ((hb1 - htup[0] + 1) / (htup[1] - htup[0] + 1))
+                        if entcnum > 0:
+                            transmission_bulksize += (
+                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
+                            ) * entcnum
+            elif _bulk.datatype == "VEC":
+                # BM
+                bint = _bulk.bulkscratch["B"]
+                mtup = _bulk.bulkscratch["M"]
+                if scratchpad_dict["B"][0] <= bint and scratchpad_dict["B"][1] >= bint:
+                    transmission_bulksize += _bulk.bulksizebyte
+            elif _bulk.datatype == "MAT":
+                # BMN
+                bint = _bulk.bulkscratch["B"]
+                mtup = _bulk.bulkscratch["M"]
+                ntup = _bulk.bulkscratch["N"]
+                if scratchpad_dict["B"][0] <= bint and scratchpad_dict["B"][1] >= bint:
+                    if bint == scratchpad_dict["B"][0]:
+                        m0 = (
+                            mtup[0]
+                            if mtup[0] > scratchpad_dict["M"][0]
+                            else scratchpad_dict["M"][0]
+                        )
+                        m1 = mtup[1]
+                    elif bint == scratchpad_dict["B"][1]:
+                        m0 = mtup[0]
+                        m1 = (
+                            mtup[1]
+                            if mtup[1] < scratchpad_dict["M"][1]
+                            else scratchpad_dict["M"][1]
+                        )
+                    else:
+                        m0 = mtup[0]
+                        m1 = mtup[1]
+                    transmission_bulksize += (
+                        _bulk.bulksizebyte * (m1 - m0 + 1) / (mtup[1] - mtup[0] + 1)
+                    )
+            # endif
+            return transmission_bulksize
 
     def readANote(self, _bulk: DataBulk):
         if check_scratchpad(_bulk) > 0:
@@ -357,18 +565,42 @@ class Memonitor:
         self.monitor[_newnote] = copy.deepcopy(_note)
         del self.monitor[_note]
 
-    """
-    # hookfunc
     # ================================================================================
+    # hooks
     # 0417 update hooks
-    """
 
     # make output note, a global method
-    def hook0_ini(self, _note, _token, _worf):
-        self.monitor[_note] = {}
-        self.monitor[_note]["token"] = _token
-        self.monitor[_note]["worf"] = _worf
-        self.monitor[_note]["loclist"] = []
+    def hook0_init_output(self, _token, _batch, _index, _layerclass):
+        note = (
+            _layerclass.modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
+        )
+        self.monitor[note] = {}
+        self.monitor[note]["token"] = _token
+        self.monitor[note]["worf"] = ClusterComponent.FeatureBuffer
+        self.monitor[note]["loclist"] = []
+        layer_scratchdict = copy.deepcopy(get_layer_scratchdict(_layerclass))
+        layer_scratchdict["B"] = _batch
+        self.monitor[note]["layer_scratchdict"] = layer_scratchdict
+
+        # if has offchip param
+        if (
+            _layerclass.input_indecies_tuple[0] == 0
+            or _layerclass.input_indecies_tuple[1] == 0
+        ):
+            panote = (
+                _layerclass.modelname
+                + "_"
+                + str(_index)
+                + "_"
+                + get_weight_datatype(_layerclass)
+            )
+            self.monitor[panote] = {}
+            self.monitor[panote]["token"] = 1
+            self.monitor[panote]["worf"] = ClusterComponent.WeightBuffer
+            self.monitor[panote]["loclist"] = []
+            self.monitor[panote]["layer_scratchdict"] = copy.deepcopy(
+                get_weight_scratchdict(_layerclass)
+            )
 
     # hook1, check before read
     def hook1_cbr(
@@ -397,7 +629,7 @@ class Memonitor:
                 return ExtraQueryList
             else:
                 _, loclist = self.search_note(note)
-                if not loclist:
+                if len(loclist) > 0:
                     for loc in loclist:
                         subbulksize = _clusterlist[
                             loc
@@ -419,7 +651,7 @@ class Memonitor:
         self, _clusterid: int, _bulk: DataBulk, _clusterlist: list,
     ):
         ExtraQueryList = []
-        note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
+        # note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         # assert _worf == ClusterComponent.FeatureBuffer:
         return ExtraQueryList
 
@@ -427,7 +659,6 @@ class Memonitor:
     def hook3_caf(
         self, _note, _clusterlist: list,
     ):
-        # note = modelname + "_" + str(layerindex) + "_" + datatype
         self.monitor[_note]["token"] -= 1
         if self.monitor[_note]["token"] == 0:
             worf = self.monitor[_note]["worf"]
@@ -437,5 +668,4 @@ class Memonitor:
                     _clusterlist[loc].WeightBuffer.release(_note)
                 elif worf == ClusterComponent.FeatureBuffer:
                     _clusterlist[loc].FeatureBuffer.release(_note)
-            self.eliminate_note(note)
-
+            self.eliminate_note(_note)

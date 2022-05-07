@@ -12,11 +12,142 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import subprocess as SP
-from torch._C import CONV_BN_FUSION
+
+from torch import Def
 import morax.model.layer as Lyr
 import morax.model.model as Model
 from morax.frontend.csvparser import apdidx2_is_index2
-from morax.model.layer import mxLCD_CNN, mxLCD_GEMM, mxLTD, mxNTD
+from morax.model.layer import (
+    LinearLayerType as LLT,
+    NonlinearLayerType as NLT,
+    Softmax1D,
+    mxLCD_CNN,
+    mxLCD_GEMM,
+    mxLTD,
+    mxNTD,
+)
+
+
+def get_layer_scratchdict(_layerclass):
+    layertype = _layerclass.layer_type
+    if layertype in [LLT.Linear, LLT.VMM]:
+        scratchpad_dict = {"M": _layerclass.col_dim}
+    elif layertype in [LLT.CONV, LLT.NGCONV]:
+        scratchpad_dict = {
+            "C": _layerclass.out_channel,
+            "H": _layerclass.feature_size / _layerclass.stride,
+            "W": _layerclass.feature_size / _layerclass.stride,
+        }
+    elif layertype == LLT.TRCONV:
+        omapsize = (
+            _layerclass.feature_size - 1
+        ) * _layerclass.stride + _layerclass.kernel_size
+        scratchpad_dict = {
+            "C": _layerclass.out_channel,
+            "H": omapsize,
+            "W": omapsize,
+        }
+    elif layertype == LLT.DWCONV:
+        scratchpad_dict = {
+            "C": _layerclass.channel,
+            "H": _layerclass.feature_size / _layerclass.stride,
+            "W": _layerclass.feature_size / _layerclass.stride,
+        }
+    elif layertype in [LLT.Residual, LLT.Batchnorm]:
+        scratchpad_dict = {
+            "C": _layerclass.channel,
+            "H": _layerclass.feature_size,
+            "W": _layerclass.feature_size,
+        }
+    elif layertype in [LLT.VDP, LLT.VADD]:
+        scratchpad_dict = {"M": _layerclass.v_dim}
+    elif layertype == LLT.GEMM:
+        scratchpad_dict = {"M": _layerclass.m_dim, "N": _layerclass.n_dim}
+    elif layertype in [LLT.MADD, LLT.Layernorm]:
+        scratchpad_dict = {"M": _layerclass.row_dim, "N": _layerclass.col_dim}
+    elif layertype == LLT.CONCAT:  # todo
+        scratchpad_dict = {}
+    elif layertype == NLT.Pooling:
+        scratchpad_dict = {
+            "C": _layerclass.channel,
+            "H": _layerclass.feature_size / _layerclass.stride,
+            "W": _layerclass.feature_size / _layerclass.stride,
+        }
+    elif layertype == NLT.Softmax1D:
+        scratchpad_dict = {"M": _layerclass.v_dim}
+    elif layertype == NLT.Softmax2D:
+        scratchpad_dict = {"M": _layerclass.row_dim, "N": _layerclass.col_dim}
+    return scratchpad_dict
+
+
+def get_datatype(_layerclass):
+    layertype = _layerclass.layer_type
+    if layertype in [LLT.Linear, LLT.VDP, LLT.VADD, LLT.VMUL, LLT.VMM]:
+        datatype = "VEC"
+    elif layertype in [
+        LLT.CONV,
+        LLT.DWCONV,
+        LLT.Residual,
+        LLT.Batchnorm,
+        LLT.TRCONV,
+        LLT.NGCONV,
+    ]:
+        datatype = "FTR"
+    elif layertype in [LLT.GEMM, LLT.MADD, LLT.Layernorm]:
+        datatype = "MAT"
+    elif layertype == NLT.Pooling:
+        datatype = "FTR"
+    elif layertype == NLT.Softmax2D:
+        datatype = "MAT"
+    elif layertype == NLT.Softmax1D:
+        datatype = "VEC"
+    return datatype
+
+
+def get_weight_datatype(_layerclass):
+    layertype = _layerclass.layer_type
+    if layertype in [LLT.VDP, LLT.VADD, LLT.VMUL]:
+        datatype = "VEC"
+    elif layertype in [
+        LLT.CONV,
+        LLT.DWCONV,
+        LLT.TRCONV,
+        LLT.NGCONV,
+    ]:
+        datatype = "WET"
+    elif layertype in [LLT.GEMM, LLT.MADD, LLT.VMM, LLT.Linear]:
+        datatype = "MAT"
+    return datatype
+
+
+def get_weight_scratchdict(_layerclass):
+    layertype = _layerclass.layer_type
+    if layertype in [LLT.Linear, LLT.VMM]:
+        scratchpad_dict = {"M": _layerclass.row_dim, "N": _layerclass.col_dim}
+    elif layertype in [LLT.CONV, LLT.NGCONV, LLT.TRCONV]:
+        scratchpad_dict = {
+            "K": _layerclass.in_channel,
+            "C": _layerclass.out_channel,
+            "R": _layerclass.kernel_size,
+            "S": _layerclass.feature_size,
+        }
+    elif layertype == LLT.DWCONV:
+        scratchpad_dict = {
+            "K": _layerclass.channel,
+            "C": _layerclass.channel,
+            "R": _layerclass.kernel_size,
+            "S": _layerclass.feature_size,
+        }
+    elif layertype in [LLT.VDP, LLT.VADD]:
+        scratchpad_dict = {"M": _layerclass.v_dim}
+    elif layertype == LLT.GEMM:
+        if _layerclass.input_indecies_tuple[1] == 0:
+            scratchpad_dict = {"M": _layerclass.k_dim, "N": _layerclass.n_dim}
+        else:
+            scratchpad_dict = {"M": _layerclass.m_dim, "N": _layerclass.k_dim}
+    elif layertype == LLT.MADD:
+        scratchpad_dict = {"M": _layerclass.row_dim, "N": _layerclass.col_dim}
+    return scratchpad_dict
 
 
 def get_lookup_adress(_index, _chn):

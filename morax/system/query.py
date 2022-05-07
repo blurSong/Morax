@@ -27,7 +27,10 @@ from morax.hardware.chip import MoraxChip
 import mapper
 import math
 from morax.model.model import ModelDAG, ModelList, ModelType
-from morax.frontend.api import get_idx_from_concat, get_lookup_adress
+from morax.frontend.api import (
+    get_idx_from_concat,
+    get_lookup_adress,
+)
 
 
 # [bulk]
@@ -230,21 +233,26 @@ class LayerQuery:
         self.SubQueryList = []
         self.FINISHED_FLAG = False
 
-        # assignment: listoftuple_clstid_nvtcid_sliceidlist
+        # add info to monitor
+        # self.outscratch = get_layer_scratchdict(_layerclass)
+        # self.outdatatype = get_datatype(_layerclass)
+
+        # assignment:
+        # listoftuple_clstid_nvtcid_sliceidlist
         # default []
         if isinstance(self.assignment, list):
             assert mapper.check_mapping_with_query(
                 self.layerclass.layer_index
             ), "{}".format(self.layerclass.layer_name)
 
-    def compile(self, _modelname, moraxchip: MoraxChip, concatlist=[]):
+    def compile(self, _modelname, _moraxchip: MoraxChip, _concatlist=[]):
         # Generate subqueries of this layer query
         print("[Morax][System] Compiling Query {}.".format(self.q_index))
         layertype = self.layerclass.layer_type
         if layertype in LLT:
             if layertype == LLT.CONCAT:
                 self.SubQueryList = copy.deepcopy(
-                    compileCONCAT(self.q_index, self.layerclass, concatlist)
+                    compileCONCAT(self.q_index, self.layerclass, _concatlist)
                 )
             else:
                 if self.assignment:  # on NVTC
@@ -254,7 +262,7 @@ class LayerQuery:
                             _modelname,
                             self.layerclass,
                             self.assignment,
-                            moraxchip,
+                            _moraxchip,
                             self.batch,
                             self.iodegree["out"],
                         )
@@ -265,7 +273,6 @@ class LayerQuery:
                             self.q_index,
                             _modelname,
                             self.layerclass,
-                            moraxchip,
                             self.batch,
                             self.iodegree["out"],
                         )
@@ -358,9 +365,6 @@ def make_tasklabel(mn, li, ti, bf: str):
     return mn + "_L" + str(li) + "T" + str(ti) + "_" + bf
 
 
-ALL = 114514
-
-
 def compileCONCAT(_index, _layerclass, _concatlist):
     #  list of concattuple = (liststartidx, head2beginidx, head, attentionlayer)
     VSubQueryList = []
@@ -390,6 +394,7 @@ def compileRRAM(
     layertype = _layerclass.layer_type
     (IIleft, IIright) = _layerclass.input_indecies_tuple
     if layertype == LLT.Linear or layertype == LLT.VMM:
+
         M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         N = math.ceil(_layerclass.col_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         M_tail = _layerclass.row_dim % MoraxConfig.RRAMXbarSize
@@ -648,8 +653,8 @@ def compileRRAM(
                         datatype = "FTR"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
-                        bulkscratch["W"] = col_iter / _layerclass.stride - 1
-                        bulkscratch["H"] = row_iter / _layerclass.stride - 1
+                        bulkscratch["W"] = (col_iter / _layerclass.stride - 1, col_iter / _layerclass.stride - 1)
+                        bulkscratch["H"] = (row_iter / _layerclass.stride - 1, row_iter / _layerclass.stride - 1)
                         bulkscratch["C"] = (0, _layerclass.in_channel - 1)
                         bsize = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(
@@ -950,7 +955,7 @@ def compileRRAM(
     return SubQueryList
 
 
-def compileCMOS(_index, _modelname, _layerclass, _chip: MoraxChip, _batch, token):
+def compileCMOS(_index, _modelname, _layerclass, _batch, token):
     # NOTE BATCH IS ALWAYS assigned on one same tc
     SubQueryList = []
     layertype = _layerclass.layer_type
