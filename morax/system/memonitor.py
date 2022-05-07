@@ -93,13 +93,13 @@ class Scratchpad:
         elif abs(htup1[0] - htup2[1]) < MoraxConfig.PEArraySize:
             hw[0] = (htup2[0], htup1[1])
         else:
-            print("merge scratc fatal")
+            print("merge scratch fatal")
         if abs(wtup1[1] - wtup2[0]) < MoraxConfig.PEArraySize:
             hw[0] = (wtup1[0], wtup2[1])
         elif abs(wtup1[0] - wtup2[1]) < MoraxConfig.PEArraySize:
             hw[0] = (wtup2[0], wtup1[1])
         else:
-            print("merge scratc fatal")
+            print("merge scratch fatal")
         return tuple(hw)
 
     def merge_scratchpad(self, _note, _layer_scratchdict):
