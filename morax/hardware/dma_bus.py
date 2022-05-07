@@ -65,7 +65,8 @@ class RingBus:
         self.ClusterTransferList.append(busatd)
         return busts.submit_t
 
-    def run_query_writebuffer(self, _q_bus: QueryRingBus, _clusterlist):
+    def run_query_then_write_buffer(self, _q_bus: QueryRingBus, _clusterlist):
+        # attached to BUS queries list
         if _q_bus.worf == ClusterComponent.FeatureBuffer:
             _clusterlist[_q_bus.toCluster].FeatureBuffer.write_buffer(
                 _q_bus.databulkclass

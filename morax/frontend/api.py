@@ -152,6 +152,7 @@ def get_weight_scratchdict(_layerclass):
 
 def get_lookup_adress(_index, _chn):
     # NOTE fake func because no real data
+    # TODO
     return (1, 1, [2, 3])
 
 

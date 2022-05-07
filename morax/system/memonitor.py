@@ -40,7 +40,7 @@ def isrange(c0, c1):
 | note                                |
 | [modelname + layerindex + datatype] |
 |-------------------------------------|
-| sizebyte                            |              
+| sizebyte                            |          
 | datatype                            |
 | total_scratchdict                   | # added 0417
 |-------------------------------------|
