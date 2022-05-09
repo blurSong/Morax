@@ -38,7 +38,8 @@ class MoraxChip:
         # CMOS:
         CandidateLayerList = [-1]
         while True:
-            # 0.1 choose one layer to run  # todo
+            # 0.1 choose one layer to run
+            # todo
             thisrun_index = OL.schedule_one_layer(
                 CandidateLayerList, _modelDAG, self.ClusterList
             )
@@ -57,15 +58,18 @@ class MoraxChip:
                 if iscandidate:
                     CandidateLayerList.append(candiidx)
 
-            thislayer_query = _modelDAG.LayerQueryClassDict[thisrun_index]
-            assert isinstance(thislayer_query, QR.LayerQuery)
+            # 0.3 get layer query
+            Query_thislayer = _modelDAG.LayerQueryClassDict[thisrun_index]
+            assert isinstance(Query_thislayer, QR.LayerQuery)
 
             # 1.1 hook0
-            layernote = (
-                _modelDAG.modelname
-                + "_"
-                + str(thislayer_query.q_index)
-                + "_"
-                + _bulk.datatype
+            token = len(_modelDAG.toVertexDict[thisrun_index])
+            onRRAM = len(Query_thislayer.assignment) != 0
+            _monitor.hook0_init(
+                token,
+                Query_thislayer.batch,
+                thisrun_index,
+                Query_thislayer.layerclass,
+                onRRAM,
             )
-            _monitor.monitor_hook0()
+

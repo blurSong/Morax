@@ -3,6 +3,7 @@
 # Author: Tao Song.
 # Last modification: 0328
 
+from http.client import CONTINUE
 import subprocess as SP
 import multiprocessing as MP
 import copy
@@ -87,11 +88,12 @@ class DMA:
         dmaad = DRAMReadActionDict(_q_dma.databulkclass, _q_dma.toCluster)
         dmats = TimeStamp(TO.ReadDRAM, _issue_t, _q_dma.databulkclass.label)
         runtime = _q_dma.databulkclass.sizebyte * 8 / MoraxConfig.OffChipBandwidthGbps
-        if _q_dma.worf == ClusterComponent.FeatureBuffer:
-            _clusterlist[_q_dma.toCluster].FeatureBuffer.write_buffer(
-                _q_dma.databulkclass
-            )
-        else:
+        # if _q_dma.worf == ClusterComponent.FeatureBuffer:
+        # NOTE DO NOTHING!
+        # _clusterlist[_q_dma.toCluster].FeatureBuffer.write_buffer(
+        #     _q_dma.databulkclass
+        # )
+        if _q_dma.worf == ClusterComponent.WeightBuffer:
             _clusterlist[_q_dma.toCluster].WeightBuffer.write_buffer(
                 _q_dma.databulkclass
             )

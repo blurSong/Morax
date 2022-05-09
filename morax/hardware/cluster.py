@@ -29,13 +29,13 @@ class MoraxCluster:
         self.VPU = vpu.VPU()
         self.SMU = smu.SMU()
         self.TCNum = MoraxConfig.TCNum
-        self.nvTCNum = MoraxConfig.nvTCNum
+        self.NVTCNum = MoraxConfig.NVTCNum
         self.TensorCoreList = []
         self.nvTensorCoreList = []
         for tcid in range(self.TCNum):
             tc = tensorcore.TensorCore(tcid)
             self.TensorCoreList.append(copy.deepcopy(tc))
-        for nvtcid in range(self.nvTCNum):
+        for nvtcid in range(self.NVTCNum):
             nvtc = nvtensorcore.nvTensorCore(nvtcid)
             self.nvTensorCoreList.append(copy.deepcopy(nvtc))
         self.ClusterTimeFilm = TimeFilm()

@@ -168,7 +168,7 @@ class PEArray:
 class TensorCoreNOC:
     def __init__(self) -> None:
         self.fanoutbus = MoraxConfig.PEArrayNum
-        self.nocbw = MoraxConfig.NOCBwGbps
+        self.nocbw = MoraxConfig.NOCBandwidthGbps
         self.NOCCastList = []
         # self.TimeFilm = TimeFilm()
 

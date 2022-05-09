@@ -255,7 +255,7 @@ class LayerQuery:
                     compileCONCAT(self.q_index, self.layerclass, _concatlist)
                 )
             else:
-                if self.assignment:  # on NVTC
+                if len(self.assignment) > 0:  # on NVTC
                     self.SubQueryList = copy.deepcopy(
                         compileRRAM(
                             self.q_index,
@@ -653,8 +653,14 @@ def compileRRAM(
                         datatype = "FTR"
                         bulkscratch = {}
                         bulkscratch["B"] = bat
-                        bulkscratch["W"] = (col_iter / _layerclass.stride - 1, col_iter / _layerclass.stride - 1)
-                        bulkscratch["H"] = (row_iter / _layerclass.stride - 1, row_iter / _layerclass.stride - 1)
+                        bulkscratch["W"] = (
+                            col_iter / _layerclass.stride - 1,
+                            col_iter / _layerclass.stride - 1,
+                        )
+                        bulkscratch["H"] = (
+                            row_iter / _layerclass.stride - 1,
+                            row_iter / _layerclass.stride - 1,
+                        )
                         bulkscratch["C"] = (0, _layerclass.in_channel - 1)
                         bsize = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
                         bulk = DataBulk(
@@ -961,12 +967,19 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
     layertype = _layerclass.layer_type
     onetcsize = MoraxConfig.PEArraySize * MoraxConfig.PEArrayNum
     (IIleft, IIright) = _layerclass.input_indecies_tuple
-    ICtypeLeft = (
-        CC.FeatureBuffer if _layerclass.input_indecies_tuple[0] < 0 else CC.WeightBuffer
-    )
-    ICtypeRight = (
-        CC.FeatureBuffer if _layerclass.input_indecies_tuple[1] < 0 else CC.WeightBuffer
-    )
+    # TODO check dag topo again
+    if IIleft == 0 and IIright < 0:
+        ICtypeLeft = CC.WeightBuffer
+        ICtypeRight = CC.FeatureBuffer
+    elif IIleft < 0 and IIright == 0:
+        ICtypeLeft = CC.FeatureBuffer
+        ICtypeRight = CC.WeightBuffer
+    elif IIleft < 0 and IIright < 0:
+        ICtypeLeft = CC.FeatureBuffer
+        ICtypeRight = CC.FeatureBuffer
+    else:
+        ICtypeLeft = CC.FeatureBuffer
+        ICtypeRight = CC.WeightBuffer
     cmos_taskindex = -1
     vpu_taskindex = -1
     # go

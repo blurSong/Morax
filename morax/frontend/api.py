@@ -106,6 +106,8 @@ def get_datatype(_layerclass):
 
 def get_weight_datatype(_layerclass):
     layertype = _layerclass.layer_type
+    IIDX_L = _layerclass.input_indecies_tuple[0]
+    IIDX_R = _layerclass.input_indecies_tuple[1]
     if layertype in [LLT.VDP, LLT.VADD, LLT.VMUL]:
         datatype = "VEC"
     elif layertype in [
@@ -314,6 +316,17 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
 
         # add edge
         if layertype != "CONCAT":
+            (IIleft, IIright) = model_list[-1].input_indecies_tuple
+            if IIleft < 0 and IIright < 0:
+                model_dag.add_edge(idx + IIleft, idx)
+                model_dag.add_edge(idx + IIright, idx)
+            elif IIleft == 0 and IIright < 0:
+                model_dag.add_edge(idx + IIright, idx)
+            elif IIleft < 0 and IIright == 0:
+                model_dag.add_edge(idx + IIleft, idx)
+            else:
+                model_dag.add_edge(-1, idx)
+            """
             eidxint = (
                 mxLCD_CNN["IDX"]
                 if _modeltype == Model.ModelType.CNN
@@ -329,6 +342,7 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
                 preidx2 = line[eidxint + 1] + idx
                 assert preidx2 < idx
                 model_dag.add_edge(preidx2, idx)
+            """
 
         elif layertype == "CONCAT":
             #  add first head last layer edge to concat layer

@@ -42,7 +42,7 @@ def isrange(c0, c1):
 |-------------------------------------|
 | sizebyte                            |          
 | datatype                            |
-| total_scratchdict                   | # added 0417
+| total_scratchdict                   | # added 0417 merge.api
 |-------------------------------------|
 | bulklabel1 | sizebyte | scratchdict |
 | bulklabel2 | sizebyte | scratchdict |
@@ -514,7 +514,7 @@ class Scratchpad:
             return transmission_bulksize
 
     def readANote(self, _bulk: DataBulk):
-        if check_scratchpad(_bulk) > 0:
+        if self.check_scratchpad(_bulk) > 0:
             return "Success"
         else:
             return "Fail"
@@ -569,24 +569,27 @@ class Memonitor:
     # hooks
     # 0417 update hooks
 
-    # make output note, a global method
-    def hook0_init_output(self, _token, _batch, _index, _layerclass):
-        note = (
+    def hook0_init(self, _token, _batch, _index, _layerclass, onRRAM=False):
+        """ 
+        make layer output note, and make offchip note if needed. 
+        invoke when run a new layer.
+        """
+
+        # make output note
+        outnote = (
             _layerclass.modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
         )
-        self.monitor[note] = {}
-        self.monitor[note]["token"] = _token
-        self.monitor[note]["worf"] = ClusterComponent.FeatureBuffer
-        self.monitor[note]["loclist"] = []
+        self.monitor[outnote] = {}
+        self.monitor[outnote]["token"] = _token
+        self.monitor[outnote]["worf"] = ClusterComponent.FeatureBuffer
+        self.monitor[outnote]["loclist"] = []
         layer_scratchdict = copy.deepcopy(get_layer_scratchdict(_layerclass))
         layer_scratchdict["B"] = _batch
-        self.monitor[note]["layer_scratchdict"] = layer_scratchdict
+        self.monitor[outnote]["layer_scratchdict"] = layer_scratchdict
 
-        # if has offchip param
-        if (
-            _layerclass.input_indecies_tuple[0] == 0
-            or _layerclass.input_indecies_tuple[1] == 0
-        ):
+        # make weight and offchip data not
+        (IIleft, IIright) = _layerclass.input_indecies_tuple
+        if (IIleft == 0 or IIright == 0) and not onRRAM:
             panote = (
                 _layerclass.modelname
                 + "_"
@@ -608,7 +611,11 @@ class Memonitor:
     ):
         ExtraQueryList = []
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
-        worf = self.monitor[note]["worf"]
+        tok, _ = self.search_note(note)
+        if tok == 0:
+            worf = ClusterComponent.FeatureBuffer
+        else:
+            worf = self.monitor[note]["worf"]
         if worf == ClusterComponent.WeightBuffer:
             if (
                 _clusterlist[_clusterid].WeightBuffer.Scratchpad.check_scratchpad(_bulk)
@@ -640,10 +647,11 @@ class Memonitor:
                             )
                             ExtraQueryList.append(qbus)
                             self.transfer_note(note, loc, _clusterid)
-                if not ExtraQueryList:
+                else:  # if not ExtraQueryList:
+                    # NOTE do not record this in strachpad and memonitor
                     qdma = QueryDMA(_bulk, _clusterid, worf)
                     ExtraQueryList.append(qdma)
-                    self.insert_note(note, _clusterid)
+                    # self.insert_note(note, _clusterid)
         return ExtraQueryList
 
     # hook2, check before write
