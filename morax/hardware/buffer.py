@@ -123,8 +123,8 @@ class ScratchpadBuffer:
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution
         assert execution in [BO.Read, BO.Write]
-        biots = TimeStamp(_q_buffer.execution, _issue_t, _q_buffer.databulkclass.label)
-        bioatd = BufferIOActionDict(_q_buffer.databulkclass.label)
+        biots = TimeStamp(_q_buffer.execution, _issue_t, _q_buffer.databulkclass.bulklabel)
+        bioatd = BufferIOActionDict(_q_buffer.databulkclass.bulklabel)
         if execution == BO.Write:
             self.write_buffer(_q_buffer.databulkclass)
             bioatd.Write = _q_buffer.databulkclass.sizebyte

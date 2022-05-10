@@ -73,6 +73,10 @@ class QueryBuffer:
         self.databulkclass = _databulkclass
         self.locationEnum = _locationEnum
         self.toEnum = _toEnum
+        self.clusterid = -1
+    
+    def update_clusterid(self,_id)
+        self.clusterid = _id
 
 
 class QueryExcute:
@@ -249,7 +253,7 @@ class LayerQuery:
         # Generate subqueries of this layer query
         print("[Morax][System] Compiling Query {}.".format(self.q_index))
         layertype = self.layerclass.layer_type
-        if layertype in LLT:
+        if isinstance(layertype, LLT):
             if layertype == LLT.CONCAT:
                 self.SubQueryList = copy.deepcopy(
                     compileCONCAT(self.q_index, self.layerclass, _concatlist)
@@ -277,7 +281,7 @@ class LayerQuery:
                             self.iodegree["out"],
                         )
                     )
-        elif layertype in NLT:
+        elif isinstance(layertype, NLT):
             self.SubQueryList = copy.deepcopy(
                 compileVPU(
                     self.q_index,
@@ -1065,7 +1069,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         tcbulksize,
                     )
                     SubQueryList.append(copy.deepcopy(qe))
-        # make vpu query after all
+        # make vpu query after all tc exe
         for b in range(B):
             vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
             qv = QueryExcuteOnVPU(
@@ -1666,7 +1670,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         group_inc = _layerclass.in_channel / _layerclass.group
         group_outc = _layerclass.out_channel / _layerclass.group
         for grp in range(G):
-            # Spcify os task
+            # Spcify OS task
             assigned_pearray = 0
             listof_tasksize_listoftup = []
             listof_scratchdict = []

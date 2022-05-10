@@ -13,7 +13,7 @@ import math
 import copy
 from enum import Enum
 from collections import UserList
-from interface import SystemVirtualOperator as SVO
+from morax.system.interface import VO
 
 int64 = np.int64
 
@@ -40,7 +40,7 @@ class TimeStamp:
 class TimeFilm(UserList):
     def __init__(self) -> None:
         super().__init__()
-        self.append(TimeStamp(SVO.SystemStart, 0, "SystemStart"))
+        self.append(TimeStamp(VO.SystemStart, 0, "SystemStart"))
 
     def append_stamp(self, _stamp: TimeStamp):
         if self[-1].submit_t >= _stamp.issue_t:

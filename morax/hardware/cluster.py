@@ -8,7 +8,7 @@ import subprocess as SP
 import multiprocessing as MP
 import copy
 import re
-from morax.system.interface import BO, ClusterComponent
+from morax.system.interface import BO, CC
 from morax.system.timefilm import TimeFilm, TimeStamp
 from morax.system.config import MoraxConfig, HWParam
 import morax.system.query as Q
@@ -44,16 +44,21 @@ class MoraxCluster:
         this_query = copy.deepcopy(_q)
         ret_t = 0
         if isinstance(this_query, Q.QueryBuffer):
-            bulklabel = this_query.databulkclass.label
-            if re.search("WET", bulklabel):
+            readorwrite = this_query.execution
+            buffertype = (
+                this_query.toEnum
+                if readorwrite == BO.Write
+                else this_query.locationEnum
+            )
+            if buffertype == CC.WeightBuffer:
                 ret_t = self.WeightBuffer.run_query(this_query, _issue_t)
-            elif re.search("FTR", bulklabel):
+            elif buffertype == CC.FeatureBuffer:
                 ret_t = self.FeatureBuffer.run_query(this_query, _issue_t)
             else:
                 raise AttributeError
             if this_query.execution == BO.Read and ret_t == -1:
                 # TODO: Apply dram or inter-cluter query
-                return _issue_t
+                return -1
         elif isinstance(this_query, Q.QueryExcuteOnNVTC):
             nvtcid = this_query.nvtcid
             ret_t = self.nvTensorCoreList[nvtcid].run_query(this_query, _issue_t)
@@ -63,7 +68,7 @@ class MoraxCluster:
                     ret_t = self.TensorCoreList[tcid].run_query(this_query, _issue_t)
             if ret_t == 0:  # all busy
                 # TODO: Apply query on other cluter
-                return _issue_t
+                return -1
         elif isinstance(this_query, Q.QueryExcuteOnVPU):
             if (
                 self.VPU.TimeFilm[-1].submit_t < _issue_t
@@ -72,8 +77,22 @@ class MoraxCluster:
                 ret_t = self.VPU.run_query(this_query, _issue_t)
             else:
                 # TODO: Apply query on other cluter
-                return _issue_t
+                return -1
         elif isinstance(this_query, Q.QueryExcuteOnSMU):
             ret_t = self.SMU.run_query(this_query, _issue_t)
+        # update timefilm
+        tasklabel = (
+            this_query.databulkclass.bulklabel
+            if isinstance(this_query, Q.QueryBuffer)
+            else this_query.tasklabel
+        )
+        timestamp = TimeStamp(this_query.execution, _issue_t, tasklabel)
+        timestamp.update_span(ret_t)
+        self.ClusterTimeFilm.append_stamp(timestamp)
         return ret_t
 
+    def get_tc_submit_t(self):
+        tclast_t_list = []
+        for tc in self.TensorCoreList:
+            tclast_t_list.append(tc.TimeFilm[-1].submit_t)
+        
