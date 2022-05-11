@@ -136,7 +136,13 @@ def spcify_querybulk(_query_list: list):
     this_querybulk = []
     EXE_FLAG = 0
     while True:
-        if EXE_FLAG == 0:
-            
         this_querybulk.append(copy.deepcopy(_query_list.pop(index=0)))
+        if EXE_FLAG == 0:
+            if isinstance(_query_list[0], QR.QueryExcute):
+                EXE_FLAG = 1
+        else:
+            if isinstance(_query_list[0], QR.QueryExcute):
+                if _query_list[0].execution == IF.BO.Read:
+                    break
+    return this_querybulk
 
