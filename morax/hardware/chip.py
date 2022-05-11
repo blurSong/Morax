@@ -12,6 +12,8 @@ import multiprocessing as MP
 import copy
 import re
 
+from pyrsistent import T
+
 import morax.system.interface as IF
 import morax.system.query as QR
 import morax.system.timefilm as TF
@@ -78,33 +80,63 @@ class MoraxChip:
                 onRRAM,
             )
 
-            # 1.1 pre assignment
-
-            # 2 check and run subquery
+            # 1 check and run subquery
+            used_cluster_id = []
+            extra_queries = []
             querynum = Query_thislayer.subquerynum
-            for subq_index in range(querynum):
-                this_subq = Query_thislayer.SubQueryList[subq_index]
+            for q_index in range(querynum):
+                this_query = Query_thislayer.SubQueryList[q_index]
                 # hook 1
-                if isinstance(this_subq, QR.QueryBuffer):
-                    if this_subq.execution == IF.BO.Read:
-                        _monitor.hook1_cbr()
+                if isinstance(this_query, QR.QueryBuffer):
+                    if this_query.execution == IF.BO.Read:
+                        this_clusterid = schedule_a_cluster(
+                            Query_thislayer, self.ClusterList
+                        )
+                        used_cluster_id.append(this_clusterid)
+                        this_query.update_clusterid(this_clusterid)
+                        extra_queries = _monitor.hook1_cbr(
+                            this_query.clusterid,
+                            this_query.databulkclass,
+                            self.ClusterList,
+                        )
+                    elif this_query.execution == IF.BO.Write:
+                        this_query.update_clusterid(this_clusterid)
+
             return
 
 
-def schedule_query(_now_t, _query: QR.LayerQuery, _clusterlist: list):
+def schedule_a_cluster(_query: QR.LayerQuery, _clusterlist: list) -> int:
     # TODO: Update greedy algo to more advanced rules
     onRRAM = len(_query.assignment) != 0
     if not onRRAM:  # onCMOS
         layertype = _query.layerclass.layer_type
         if isinstance(layertype, IF.LLT):
-            clstnum = CFG.MoraxConfig.ClusterNum
-            tcnum = CFG.MoraxConfig.TCNum
             tclast_t_list = []
             for clst in _clusterlist:
-                tclast_t_list.append(clst.get_tc_submit_t())
+                tclast_t_list.append(min(clst.report_tc_submit_t()))
+            this_clstid = tclast_t_list.index(min(tclast_t_list))
+        elif isinstance(layertype, IF.NLT):
+            vpulast_t_list = []
+            for clst in _clusterlist:
+                vpulast_t_list.append(clst.report_vpu_submit_t())
+            this_clstid = vpulast_t_list.index(min(vpulast_t_list))
+    else:
+        # dict of {clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]}
+        clstid_list = []
+        assignment_doclotnsl = _query.assignment
+        for clstid, _ in assignment_doclotnsl.items():
+            clstid_list.append(clstid)
+        this_clstid = min(clstid_list)  # why
+    return this_clstid
 
-    last_t_list = []
-    for clst in self.ClusterList:
-        last_t_list.append(clst.ClusterTimeFilm[-1].submit_t)
-    issue_t = min(last_t_list)
-    return
+
+def spcify_querybulk(_query_list: list):
+    assert isinstance(_query_list[0], QR.QueryBuffer)
+    assert _query_list[0].execution == IF.BO.Read
+    this_querybulk = []
+    EXE_FLAG = 0
+    while True:
+        if EXE_FLAG == 0:
+            
+        this_querybulk.append(copy.deepcopy(_query_list.pop(index=0)))
+

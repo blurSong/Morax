@@ -74,8 +74,8 @@ class QueryBuffer:
         self.locationEnum = _locationEnum
         self.toEnum = _toEnum
         self.clusterid = -1
-    
-    def update_clusterid(self,_id)
+
+    def update_clusterid(self, _id):
         self.clusterid = _id
 
 

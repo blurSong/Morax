@@ -607,7 +607,7 @@ class Memonitor:
 
     # hook1, check before read
     def hook1_cbr(
-        self, _clusterid: int, _bulk: DataBulk, _clusterlist: list,
+        self, _clusterid: int, _bulk: DataBulk, _chip_clusterlist: list,
     ):
         ExtraQueryList = []
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
@@ -618,7 +618,7 @@ class Memonitor:
             worf = self.monitor[note]["worf"]
         if worf == ClusterComponent.WeightBuffer:
             if (
-                _clusterlist[_clusterid].WeightBuffer.Scratchpad.check_scratchpad(_bulk)
+                _chip_clusterlist[_clusterid].WeightBuffer.Scratchpad.check_scratchpad(_bulk)
                 > 0
             ):
                 return ExtraQueryList
@@ -628,7 +628,7 @@ class Memonitor:
                 self.insert_note(note, _clusterid)
         elif worf == ClusterComponent.FeatureBuffer:
             if (
-                _clusterlist[_clusterid].FeatureBuffer.Scratchpad.check_scratchpad(
+                _chip_clusterlist[_clusterid].FeatureBuffer.Scratchpad.check_scratchpad(
                     _bulk
                 )
                 == _bulk.bulksizebyte
@@ -638,7 +638,7 @@ class Memonitor:
                 _, loclist = self.search_note(note)
                 if len(loclist) > 0:
                     for loc in loclist:
-                        subbulksize = _clusterlist[
+                        subbulksize = _chip_clusterlist[
                             loc
                         ].FeatureBuffer.Scratchpad.check_scratchpad(_bulk)
                         if subbulksize > 0:

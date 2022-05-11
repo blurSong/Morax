@@ -66,6 +66,7 @@ class MoraxCluster:
             for tcid in range(self.TCNum):
                 if self.TensorCoreList[tcid].TimeFilm[-1].submit_t < _issue_t:
                     ret_t = self.TensorCoreList[tcid].run_query(this_query, _issue_t)
+                    break
             if ret_t == 0:  # all busy
                 # TODO: Apply query on other cluter
                 return -1
@@ -91,8 +92,11 @@ class MoraxCluster:
         self.ClusterTimeFilm.append_stamp(timestamp)
         return ret_t
 
-    def get_tc_submit_t(self):
+    def report_tc_submit_t(self):
         tclast_t_list = []
         for tc in self.TensorCoreList:
             tclast_t_list.append(tc.TimeFilm[-1].submit_t)
-        
+        return tclast_t_list
+
+    def report_vpu_submit_t(self):
+        return self.VPU.TimeFilm[-1].submit_t
