@@ -145,4 +145,3 @@ def spcify_querybulk(_query_list: list):
                 if _query_list[0].execution == IF.BO.Read:
                     break
     return this_querybulk
-
