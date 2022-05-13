@@ -48,6 +48,7 @@ class VirtualOperator(Enum):
     SystemStart = 400
     SystemStop = 401
     EditMemonitor = 402
+    QuerySeprator = 403
 
 
 CC = ClusterComponent

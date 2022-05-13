@@ -4,6 +4,7 @@
 # Last modification: 0327
 
 from ast import Break
+from http.client import CONTINUE
 from stat import S_ISFIFO
 from urllib.request import install_opener
 import numpy as np
@@ -84,6 +85,10 @@ class MoraxChip:
             used_cluster_id = []
             extra_queries = []
             querynum = Query_thislayer.subquerynum
+            while Query_thislayer:
+                querybulk = spcify_querybulk(Query_thislayer)
+                this_clusterid = schedule_a_cluster(querybulk, self.ClusterList)
+
             for q_index in range(querynum):
                 this_query = Query_thislayer.SubQueryList[q_index]
                 # hook 1
@@ -105,25 +110,37 @@ class MoraxChip:
             return
 
 
-def schedule_a_cluster(_query: QR.LayerQuery, _clusterlist: list) -> int:
-    # TODO: Update greedy algo to more advanced rules
-    onRRAM = len(_query.assignment) != 0
-    if not onRRAM:  # onCMOS
-        layertype = _query.layerclass.layer_type
-        if isinstance(layertype, IF.LLT):
-            tclast_t_list = []
-            for clst in _clusterlist:
-                tclast_t_list.append(min(clst.report_tc_submit_t()))
-            this_clstid = tclast_t_list.index(min(tclast_t_list))
-        elif isinstance(layertype, IF.NLT):
-            vpulast_t_list = []
-            for clst in _clusterlist:
-                vpulast_t_list.append(clst.report_vpu_submit_t())
-            this_clstid = vpulast_t_list.index(min(vpulast_t_list))
-    else:
+def schedule_a_cluster(
+    _querylist: list, _clusterlist: list, _layerqueryclass: QR.LayerQuery
+) -> int:
+    # TODO: Update greedy algo to more advanced rule
+    for q in _querylist:
+        if isinstance(q, QR.QueryBuffer):
+            continue
+        else:
+            if isinstance(q, QR.QueryExcuteOnNVTC):
+                PLACE = IF.CC.nvTensorCore
+            elif isinstance(q, QR.QueryExcuteOnVPU):
+                PLACE = IF.CC.VPU
+            elif isinstance(q, QR.QueryExcuteOnTC):
+                PLACE = IF.CC.TensorCore
+            elif isinstance(q, QR.QueryExcuteOnSMU):
+                PLACE = IF.CC.SMU
+            break
+    if PLACE == IF.CC.TensorCore:
+        tclast_t_list = []
+        for clst in _clusterlist:
+            tclast_t_list.append(min(clst.report_tc_submit_t()))
+            his_clstid = tclast_t_list.index(min(tclast_t_list))
+    elif PLACE == IF.CC.VPU:
+        vpulast_t_list = []
+        for clst in _clusterlist:
+            vpulast_t_list.append(clst.report_vpu_submit_t())
+        this_clstid = vpulast_t_list.index(min(vpulast_t_list))
+    elif PLACE == IF.CC.nvTensorCore:
         # dict of {clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]}
         clstid_list = []
-        assignment_doclotnsl = _query.assignment
+        assignment_doclotnsl = _layerqueryclass.assignment
         for clstid, _ in assignment_doclotnsl.items():
             clstid_list.append(clstid)
         this_clstid = min(clstid_list)  # why
@@ -141,7 +158,12 @@ def spcify_querybulk(_query_list: list):
             if isinstance(_query_list[0], QR.QueryExcute):
                 EXE_FLAG = 1
         else:
-            if isinstance(_query_list[0], QR.QueryExcute):
+            if len(_query_list) == 0:
+                break
+            elif isinstance(_query_list[0], QR.VritualQuerySeparator):
+                _query_list.pop(index=0)
+                break
+            elif isinstance(_query_list[0], QR.QueryBuffer):
                 if _query_list[0].execution == IF.BO.Read:
                     break
     return this_querybulk

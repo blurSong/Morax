@@ -67,6 +67,11 @@ class VritualQueryMonitor(VritualQuery):
         self.actlist = copy.deepcopy(_actlist)
 
 
+class VritualQuerySeparator(VritualQuery):
+    def __init__(self):
+        super().__init__(VO.QuerySeprator)
+
+
 class QueryBuffer:
     def __init__(self, _databulkclass: DataBulk, _execution, _locationEnum, _toEnum):
         self.execution = _execution
@@ -1070,6 +1075,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     )
                     SubQueryList.append(copy.deepcopy(qe))
         # make vpu query after all tc exe
+        # add QV
+        qv = VritualQuerySeparator()
+        SubQueryList.append(qv)
         for b in range(B):
             vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
             qv = QueryExcuteOnVPU(
