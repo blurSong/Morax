@@ -10,7 +10,7 @@ import copy
 from morax.system.interface import TO, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from morax.system.config import MoraxConfig, HWParam
-from morax.system.query import QueryRingBus, QueryDMA
+from morax.system.query import QueryBuffer, QueryRingBus, QueryDMA
 from buffer import DataBulk
 
 
@@ -66,15 +66,15 @@ class RingBus:
         self.ClusterTransferList.append(busatd)
         return busts.submit_t
 
-    def run_query_then_write_buffer(self, _q_bus: QueryRingBus, _clusterlist):
+    def run_query_then_write_buffer(self, _q_buffer: QueryBuffer, _clusterlist):
         # attached to BUS queries list
-        if _q_bus.worf == ClusterComponent.FeatureBuffer:
-            _clusterlist[_q_bus.toCluster].FeatureBuffer.write_buffer(
-                _q_bus.databulkclass
+        if _q_buffer.locationEnum == ClusterComponent.FeatureBuffer:
+            _clusterlist[_q_buffer.clusterid].FeatureBuffer.write_buffer(
+                _q_buffer.databulkclass
             )
         else:
-            _clusterlist[_q_bus.toCluster].WeightBuffer.write_buffer(
-                _q_bus.databulkclass
+            _clusterlist[_q_buffer.clusterid].WeightBuffer.write_buffer(
+                _q_buffer.databulkclass
             )
         return
 

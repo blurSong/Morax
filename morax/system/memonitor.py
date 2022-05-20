@@ -539,15 +539,16 @@ class Memonitor:
         self.scratchpadnum = MoraxConfig.ClusterNum
         self.monitor = {}
 
-    def insert_note(self, _note: str, _location: int):
-        self.monitor[_note]["loclist"].append(_location)
+    def add_loc(self, _note: str, _location: int):
+        if _location not in self.monitor[_note]["loclist"]:
+            self.monitor[_note]["loclist"].append(_location)
 
     def transfer_note(self, _note, _from, _to):
         assert _from in self.monitor[_note]["loclist"]
         if _to not in self.monitor[_note]["loclist"]:
             self.monitor[_note]["loclist"].append(_to)
 
-    def eliminate_location(self, _note, _location):
+    def eliminate_loc(self, _note, _location):
         self.monitor[_note]["loclist"].remove(_location)
         if not self.monitor[_note]["loclist"]:
             del self.monitor[_note]
@@ -566,8 +567,7 @@ class Memonitor:
         del self.monitor[_note]
 
     # ================================================================================
-    # hooks
-    # 0417 update hooks
+    # hooks 0517
 
     def hook0_init(self, _token, _batch, _index, _layerclass, onRRAM=False):
         """ 
@@ -618,7 +618,9 @@ class Memonitor:
             worf = self.monitor[note]["worf"]
         if worf == ClusterComponent.WeightBuffer:
             if (
-                _chip_clusterlist[_clusterid].WeightBuffer.Scratchpad.check_scratchpad(_bulk)
+                _chip_clusterlist[_clusterid].WeightBuffer.Scratchpad.check_scratchpad(
+                    _bulk
+                )
                 > 0
             ):
                 return ExtraQueryList
@@ -656,12 +658,13 @@ class Memonitor:
 
     # hook2, check before write
     def hook2_cbw(
-        self, _clusterid: int, _bulk: DataBulk, _clusterlist: list,
+        self, _clusterid: int, _index, _layerclass,
     ):
-        ExtraQueryList = []
-        # note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
-        # assert _worf == ClusterComponent.FeatureBuffer:
-        return ExtraQueryList
+        outnote = (
+            _layerclass.modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
+        )
+        self.add_loc(outnote, _clusterid)
+        return
 
     # hook3, check input after one layer finish
     def hook3_caf(

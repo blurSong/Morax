@@ -119,6 +119,9 @@ class ScratchpadBuffer:
     def release(self, _note):
         self.WaterLineByte -= self.Scratchpad.get_size(_note)
         self.Scratchpad.delANote(_note)
+    
+    def merge_buffer(self, _note, _layerdict):
+        self.Scratchpad.merge_scratchpad(_note,_layerdict)
 
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution

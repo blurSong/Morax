@@ -32,6 +32,7 @@ from morax.frontend.api import (
     get_lookup_adress,
 )
 
+# TODO add VritualQuerySeparator to all compfunc
 
 # [bulk]
 # indicate the data form of input and weight
@@ -217,9 +218,9 @@ class QueryDMA:
         self.worf = _worf
 
 
-""" ========================================================================================================================
+""" ============================================================================================================
                      generate layer query and compilie them to sub query
-============================================================================================================================
+================================================================================================================
 """
 
 
@@ -1076,8 +1077,8 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     SubQueryList.append(copy.deepcopy(qe))
         # make vpu query after all tc exe
         # add QV
-        qv = VritualQuerySeparator()
-        SubQueryList.append(qv)
+        qsep = VritualQuerySeparator()
+        SubQueryList.append(qsep)
         for b in range(B):
             vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
             qv = QueryExcuteOnVPU(

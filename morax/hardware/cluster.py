@@ -56,13 +56,19 @@ class MoraxCluster:
                 ret_t = self.FeatureBuffer.run_query(this_query, _issue_t)
             else:
                 raise AttributeError
+            """
             if this_query.execution == BO.Read and ret_t == -1:
                 # TODO: Apply dram or inter-cluter query
                 return -1
+            """
         elif isinstance(this_query, Q.QueryExcuteOnNVTC):
             nvtcid = this_query.nvtcid
             ret_t = self.nvTensorCoreList[nvtcid].run_query(this_query, _issue_t)
         elif isinstance(this_query, Q.QueryExcuteOnTC):
+            tclist = self.report_tc_submit_t()
+            tcid = tclist.index(min(tclist))
+            ret_t = self.TensorCoreList[tcid].run_query(this_query, _issue_t)
+            """
             for tcid in range(self.TCNum):
                 if self.TensorCoreList[tcid].TimeFilm[-1].submit_t < _issue_t:
                     ret_t = self.TensorCoreList[tcid].run_query(this_query, _issue_t)
@@ -70,6 +76,7 @@ class MoraxCluster:
             if ret_t == 0:  # all busy
                 # TODO: Apply query on other cluter
                 return -1
+            """
         elif isinstance(this_query, Q.QueryExcuteOnVPU):
             if (
                 self.VPU.TimeFilm[-1].submit_t < _issue_t
@@ -78,7 +85,7 @@ class MoraxCluster:
                 ret_t = self.VPU.run_query(this_query, _issue_t)
             else:
                 # TODO: Apply query on other cluter
-                return -1
+                ret_t = self.VPU.run_query(this_query, _issue_t)
         elif isinstance(this_query, Q.QueryExcuteOnSMU):
             ret_t = self.SMU.run_query(this_query, _issue_t)
         # update timefilm
@@ -100,3 +107,10 @@ class MoraxCluster:
 
     def report_vpu_submit_t(self):
         return self.VPU.TimeFilm[-1].submit_t
+
+    def report_fb_submit_t(self):
+        return self.FeatureBuffer.TimeFilm[-1].submit_t
+
+    def report_wb_submit_t(self):
+        return self.WeightBuffer.TimeFilm[-1].submit_t
+
