@@ -38,16 +38,16 @@ class MoraxChip:
         for clstid in range(self.ClusterNum):
             clst = cluster.MoraxCluster(clstid)
             self.ClusterList.append(copy.deepcopy(clst))
-        self.MoraxTileFilm = TF.TimeFilm()
+        self.MoraxTimeFilm = TF.TimeFilm()
 
     def invoke_morax(self, _modelDAG: ModelDAG, _monitor: MM.Memonitor):
         # RRAM:
         # CMOS:
         CandidateLayerList = [-1]
         while True:
-            # 0.1 choose one layer to run
+            # 0.1 choose one layer, report layer index and issue_time
             # todo
-            thisrun_index = OL.schedule_one_layer(
+            thisrun_index, LAYER_ISSUE_TIME = OL.schedule_one_layer(
                 CandidateLayerList, _modelDAG, self.ClusterList
             )
 
@@ -68,6 +68,7 @@ class MoraxChip:
             # 0.3 get layer query
             ThisLayerQuery = _modelDAG.LayerQueryClassDict[thisrun_index]
             assert isinstance(ThisLayerQuery, QR.LayerQuery)
+            ThisLayerQuery.set_issue_t(LAYER_ISSUE_TIME)
 
             # 0.4 hook 0
             token = len(_modelDAG.toVertexDict[thisrun_index])
@@ -80,63 +81,70 @@ class MoraxChip:
                 onRRAM,
             )
 
-            # 1 go
+            # ready2go
             used_cluster_id = []
             extra_queries = []
-            querynum = ThisLayerQuery.subquerynum
             subquerylist = copy.deepcopy(ThisLayerQuery.SubQueryList)
-            SUBMIT_T = 0
+            ISSUE_T = LAYER_ISSUE_TIME
+            SUBMIT_T = ISSUE_T
+            SUBMIT_T_0 = ISSUE_T
             while subquerylist:
-                # 1.1 spcify query bulks and clst id
+                """"""
+                # spcify query bulks and clst id
                 subquerybulk = spcify_querybulk(subquerylist)
                 this_clusterid = schedule_a_cluster(
                     subquerybulk, self.ClusterList, ThisLayerQuery
                 )
                 used_cluster_id.append(this_clusterid)
-                # 1.2 run this q bulk
-                for q_sub in subquerybulk:
-                    this_subquery = q_sub
+                """"""
+                # run this q bulk
+                for q_sub_idx in range(len(subquerybulk)):
+                    this_subquery = subquerybulk[q_sub_idx]
                     extra_queries.clear()
-                    # hook 1 2
+                    # 1.1 hook 1 2
                     if isinstance(this_subquery, QR.QueryBuffer):
-                        this_subquery.update_clusterid(this_clusterid)
                         if this_subquery.execution == IF.BO.Read:
-                            this_subquery.update_clusterid(this_clusterid)
+                            if not this_subquery.location_assigned():
+                                this_subquery.update_clusterid(this_clusterid)
                             extra_queries = _monitor.hook1_cbr(
                                 this_subquery.clusterid,
                                 this_subquery.databulkclass,
                                 self.ClusterList,
                             )
                         elif this_subquery.execution == IF.BO.Write:
+                            this_subquery.update_clusterid(this_clusterid)
                             _monitor.hook2_cbw(
                                 this_subquery.clusterid,
                                 thisrun_index,
                                 ThisLayerQuery.layerclass,
                             )
-                    # 1.3 run extra_queries
-                    EXTRA_T = 0
+                    """"""
+                    # 1.2 run extra_queries
+                    EXTRA_T = LAYER_ISSUE_TIME
                     if extra_queries:
                         bus_invoke = False
                         for q_ex in extra_queries:
                             if isinstance(q_ex, QR.QueryDMA):
                                 EXTRA_T = self.DMA.run_query(
-                                    q_ex, EXTRA_T, this_subquery.clusterid
+                                    q_ex, 0, this_subquery.clusterid
                                 )
                             elif isinstance(q_ex, QR.QueryRingBus):
                                 bus_invoke = True
-                                EXTRA_T = self.RingBus.run_query(q_ex, EXTRA_T)
+                                EXTRA_T = self.RingBus.run_query(q_ex, LAYER_ISSUE_TIME)
                         if bus_invoke:
                             self.RingBus.run_query_then_write_buffer(
                                 this_subquery, self.ClusterList
                             )
-                    # 1.4 run this_subquery
-                    ISSUE_T = SUBMIT_T + EXTRA_T
+                    """"""
+                    # 1.3 run this_subquery
                     if isinstance(this_subquery, QR.QueryBuffer):
                         if this_subquery.execution == IF.BO.Read:
+                            ISSUE_T = EXTRA_T
                             SUBMIT_T = self.ClusterList[
                                 this_subquery.clusterid
-                            ].run_query(this_subquery, EXTRA_T)
+                            ].run_query(this_subquery, ISSUE_T)
                         if this_subquery.execution == IF.BO.Write:
+                            ISSUE_T = SUBMIT_T
                             SUBMIT_T = self.ClusterList[
                                 this_subquery.clusterid
                             ].run_query(this_subquery, ISSUE_T)
@@ -150,6 +158,7 @@ class MoraxChip:
                                 this_subquery, TC_ISSUE_T
                             )
                         if isinstance(this_subquery, QR.QueryExcuteOnVPU):
+                            ISSUE_T = SUBMIT_T
                             SUBMIT_T = self.ClusterList[this_clusterid].run_query(
                                 this_subquery, ISSUE_T
                             )
@@ -163,9 +172,21 @@ class MoraxChip:
                                     this_subquery.clusterid
                                 ].run_query(this_subquery, ISSUE_T)
                             if re.search(this_subquery.dfmod, "Xbar"):
-                                SUBMIT_T = self.ClusterList[
-                                    this_subquery.clusterid
-                                ].run_query(this_subquery, SUBMIT_T)
+                                ISSUE_T = SUBMIT_T
+                                SUBMIT_T_0 = max(
+                                    self.ClusterList[this_subquery.clusterid].run_query(
+                                        this_subquery, ISSUE_T
+                                    ),
+                                    SUBMIT_T_0,
+                                )
+                                SUBMIT_T = (
+                                    SUBMIT_T_0
+                                    if isinstance(
+                                        subquerybulk[q_sub_idx + 1], QR.QueryExcuteOnVPU
+                                    )
+                                    else SUBMIT_T
+                                )
+
         return
 
 

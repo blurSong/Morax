@@ -84,6 +84,9 @@ class QueryBuffer:
     def update_clusterid(self, _id):
         self.clusterid = _id
 
+    def location_assigned(self):
+        return self.clusterid >= 0
+
 
 class QueryExcute:
     def __init__(self, _layerclass, _tasklabel: str):
@@ -241,6 +244,8 @@ class LayerQuery:
         self.iodegree = {"in": _indegree, "out": _outdegree}
         self.subquerynum = 0
         self.SubQueryList = []
+        self.ISSUE_TIME = -1
+        self.SUBMIT_TIME = -1
         self.FINISHED_FLAG = False
 
         # add info to monitor
@@ -254,6 +259,19 @@ class LayerQuery:
             assert mapper.check_mapping_with_query(
                 self.layerclass.layer_index
             ), "{}".format(self.layerclass.layer_name)
+
+    def set_issue_t(self, _issue_t):
+        assert _issue_t > 0
+        self.ISSUE_TIME = _issue_t
+
+    def set_submit_t(self, _submit_t):
+        assert _submit_t > 0
+        self.SUBMIT_TIME = _submit_t
+        self.FINISHED_FLAG = True
+
+    def get_submit_t(self):
+        assert self.FINISHED_FLAG
+        return self.SUBMIT_TIME
 
     def compile(self, _modelname, _moraxchip: MoraxChip, _concatlist=[]):
         # Generate subqueries of this layer query
@@ -404,7 +422,7 @@ def compileRRAM(
     layertype = _layerclass.layer_type
     (IIleft, IIright) = _layerclass.input_indecies_tuple
     if layertype == LLT.Linear or layertype == LLT.VMM:
-
+        # (CLSTNVTC B) V WB
         M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         N = math.ceil(_layerclass.col_dim * 1.0 / MoraxConfig.RRAMXbarSize)
         M_tail = _layerclass.row_dim % MoraxConfig.RRAMXbarSize
@@ -460,6 +478,7 @@ def compileRRAM(
                         last,
                     )
                     bsize = bsize * MoraxConfig.PrecisionBits / 8
+                    # for bat in range(_batch):
                     bulk = DataBulk(
                         _modelname, _index + +IIleft, datatype, bsize, bulkscratch
                     )
@@ -467,6 +486,7 @@ def compileRRAM(
                     tasklabel = make_tasklabel(
                         _modelname, _index, taskindex, mxLTD[layertype]
                     )
+                    qr.update_clusterid(clstid)  # add 0521
                     qe = QueryExcuteOnNVTC(
                         _layerclass,
                         tasklabel,
@@ -478,7 +498,8 @@ def compileRRAM(
                     )
                     SubQueryList.append(copy.deepcopy(qr))
                     SubQueryList.append(copy.deepcopy(qe))
-            tasklabel = make_tasklabel(_modelname, _index, 0, "PostProcess")
+                    # SubQueryList.append(VritualQuerySeparator())
+            tasklabel = make_tasklabel(_modelname, _index, bat, "PostProcess")
             qv = QueryExcuteOnVPU(
                 _layerclass,
                 tasklabel,
@@ -487,18 +508,6 @@ def compileRRAM(
                 (M, _layerclass.col_dim),
             )
             SubQueryList.append(copy.deepcopy(qv))
-            """
-            if mxLTD[layertype] == "Linear":
-                bulk = DataBulk(
-                    _modelname,
-                    _index,
-                    "FTR",
-                    _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
-                    {"B": (bat, bat), "HW": ALL, "C": ALL},
-                    token,
-                )
-            else:
-            """
             bulk = DataBulk(
                 _modelname,
                 _index,
@@ -509,6 +518,7 @@ def compileRRAM(
             )
             qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
             SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.CONV:
@@ -525,10 +535,10 @@ def compileRRAM(
             % MoraxConfig.RRAMXbarSize
         )
         N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
+        omapsize = _layerclass.feature_size / _layerclass.stride
         rram_taskindex = -1
         vpu_taskindex = -1
         for bat in range(_batch):
-            omapsize = _layerclass.feature_size / _layerclass.stride
             for row_iter in range(omapsize):
                 for col_iter in range(omapsize):
                     # make simple bulk
@@ -626,6 +636,7 @@ def compileRRAM(
                     )
                     qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
+                    SubQueryList.append(VritualQuerySeparator())
             # End for
 
     if layertype == LLT.TRCONV:
@@ -642,12 +653,12 @@ def compileRRAM(
             % MoraxConfig.RRAMXbarSize
         )
         N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
+        omapsize = (
+            _layerclass.feature_size - 1
+        ) * _layerclass.stride + _layerclass.kernel_size
         rram_taskindex = -1
         vpu_taskindex = -1
         for bat in range(_batch):
-            omapsize = (
-                _layerclass.feature_size - 1
-            ) * _layerclass.stride + _layerclass.kernel_size
             for row_iter in range(omapsize):
                 for col_iter in range(omapsize):
                     if (
@@ -727,6 +738,7 @@ def compileRRAM(
                     )
                     qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
+                    SubQueryList.append(VritualQuerySeparator())
             # End for
 
     if layertype == LLT.NGCONV:
@@ -753,9 +765,9 @@ def compileRRAM(
         vpu_taskindex = -1
         group_inchannel = _layerclass.in_channel / _layerclass.group
         group_outchannel = _layerclass.out_channel / _layerclass.group
+        omapsize = _layerclass.feature_size / _layerclass.stride
         for bat in range(_batch):
             for grp in range(_layerclass.group):
-                omapsize = _layerclass.feature_size / _layerclass.stride
                 for row_iter in range(omapsize):
                     for col_iter in range(omapsize):
                         # make simple bulk
@@ -852,6 +864,7 @@ def compileRRAM(
                         )
                         qw = QueryBuffer(bulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                         SubQueryList.append(copy.deepcopy(qw))
+                        SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.GEMM:
@@ -861,6 +874,7 @@ def compileRRAM(
               =========       =========
                               =========
                               ndim
+        RRRR EEEE
         """
         # idxtup = _layerclass.input_indecies_tuple
         if IIright == 0:
@@ -930,6 +944,7 @@ def compileRRAM(
                         qr = QueryBuffer(
                             bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore
                         )
+                        qr.update_clusterid(clstid)  # add 0521
                         SubQueryList.append(copy.deepcopy(qr))
 
                 for line in range(vfetch):
@@ -967,6 +982,7 @@ def compileRRAM(
                     )
                     qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
+                    SubQueryList.append(VritualQuerySeparator())
             # End for
     return SubQueryList
 

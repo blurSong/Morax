@@ -113,4 +113,3 @@ class MoraxCluster:
 
     def report_wb_submit_t(self):
         return self.WeightBuffer.TimeFilm[-1].submit_t
-

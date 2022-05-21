@@ -64,7 +64,8 @@ class RingBus:
         busts.update_span(runtime)
         self.TimeFilm.append_stamp(busts)
         self.ClusterTransferList.append(busatd)
-        return busts.submit_t
+        # return busts.submit_t
+        return self.TimeFilm[-1].submit_t
 
     def run_query_then_write_buffer(self, _q_buffer: QueryBuffer, _clusterlist):
         # attached to BUS queries list
@@ -100,4 +101,5 @@ class DMA:
         dmats.update_span(runtime)
         self.TimeFilm.append_stamp(dmats)
         self.DRAMReadList.append(dmaad)
-        return dmats.submit_t
+        # return dmats.submit_t
+        return self.TimeFilm[-1].submit_t

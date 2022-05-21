@@ -119,14 +119,16 @@ class ScratchpadBuffer:
     def release(self, _note):
         self.WaterLineByte -= self.Scratchpad.get_size(_note)
         self.Scratchpad.delANote(_note)
-    
+
     def merge_buffer(self, _note, _layerdict):
-        self.Scratchpad.merge_scratchpad(_note,_layerdict)
+        self.Scratchpad.merge_scratchpad(_note, _layerdict)
 
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution
         assert execution in [BO.Read, BO.Write]
-        biots = TimeStamp(_q_buffer.execution, _issue_t, _q_buffer.databulkclass.bulklabel)
+        biots = TimeStamp(
+            _q_buffer.execution, _issue_t, _q_buffer.databulkclass.bulklabel
+        )
         bioatd = BufferIOActionDict(_q_buffer.databulkclass.bulklabel)
         if execution == BO.Write:
             self.write_buffer(_q_buffer.databulkclass)
@@ -146,4 +148,5 @@ class ScratchpadBuffer:
         biots.update_span(runtime)
         self.TimeFilm.append_stamp(biots)
         self.BufferIOList.append(bioatd)
-        return biots.submit_t
+        # return biots.submit_t
+        return self.TimeFilm[-1].submit_t
