@@ -126,27 +126,31 @@ class ScratchpadBuffer:
     def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
         execution = _q_buffer.execution
         assert execution in [BO.Read, BO.Write]
+        timestamplabel = "read_" if execution == BO.Read else "write_"
         biots = TimeStamp(
-            _q_buffer.execution, _issue_t, _q_buffer.databulkclass.bulklabel
+            _q_buffer.execution,
+            _issue_t,
+            timestamplabel + _q_buffer.databulkclass.bulklabel,
         )
         bioatd = BufferIOActionDict(_q_buffer.databulkclass.bulklabel)
-        if execution == BO.Write:
-            self.write_buffer(_q_buffer.databulkclass)
-            bioatd.Write = _q_buffer.databulkclass.sizebyte
-        else:
-            read_result = self.read_buffer(_q_buffer.databulkclass)
-            if read_result == "Success":
-                bioatd.Read = _q_buffer.databulkclass.sizebyte
+        if _q_buffer.databulkclass.bulksizebyte > 0:
+            if execution == BO.Write:
+                self.write_buffer(_q_buffer.databulkclass)
+                bioatd.Write = _q_buffer.databulkclass.sizebyte
             else:
-                return -1
-                # need inter cluster read or dram read
+                read_result = self.read_buffer(_q_buffer.databulkclass)
+                if read_result == "Success":
+                    bioatd.Read = _q_buffer.databulkclass.sizebyte
+                else:
+                    return -1
+                    # need inter cluster read or dram read
         runtime = (
             _q_buffer.databulkclass.sizebyte * 8 / self.BandwidthGbps
             if self.BandwidthGbps != 0
             else 0
         )
         biots.update_span(runtime)
-        self.TimeFilm.append_stamp(biots)
+        self.TimeFilm.append_stamp_bufferver(biots)
         self.BufferIOList.append(bioatd)
-        # return biots.submit_t
-        return self.TimeFilm[-1].submit_t
+        return biots.submit_t
+        # return self.TimeFilm[-1].submit_t

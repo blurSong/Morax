@@ -85,19 +85,21 @@ class MoraxChip:
             used_cluster_id = []
             extra_queries = []
             subquerylist = copy.deepcopy(ThisLayerQuery.SubQueryList)
-            ISSUE_T = LAYER_ISSUE_TIME
-            SUBMIT_T = ISSUE_T
-            SUBMIT_T_0 = ISSUE_T
+
             while subquerylist:
                 """"""
                 # spcify query bulks and clst id
                 subquerybulk = spcify_querybulk(subquerylist)
                 this_clusterid = schedule_a_cluster(
-                    subquerybulk, self.ClusterList, ThisLayerQuery
+                    subquerybulk, self.ClusterList, ThisLayerQuery, LAYER_ISSUE_TIME
                 )
-                used_cluster_id.append(this_clusterid)
+                if this_clusterid not in used_cluster_id:
+                    used_cluster_id.append(this_clusterid)
                 """"""
                 # run this q bulk
+                ISSUE_T = LAYER_ISSUE_TIME
+                SUBMIT_T = ISSUE_T
+                SUBMIT_T_0 = ISSUE_T
                 for q_sub_idx in range(len(subquerybulk)):
                     this_subquery = subquerybulk[q_sub_idx]
                     extra_queries.clear()
@@ -143,6 +145,7 @@ class MoraxChip:
                             SUBMIT_T = self.ClusterList[
                                 this_subquery.clusterid
                             ].run_query(this_subquery, ISSUE_T)
+                            # SUBMIT_T = max(SUBMIT_T_0, SUBMIT_T) # for (R (REW))
                         if this_subquery.execution == IF.BO.Write:
                             ISSUE_T = SUBMIT_T
                             SUBMIT_T = self.ClusterList[
@@ -150,14 +153,17 @@ class MoraxChip:
                             ].run_query(this_subquery, ISSUE_T)
                     elif isinstance(this_subquery, QR.QueryExcute):
                         if isinstance(this_subquery, QR.QueryExcuteOnTC):
-                            TC_ISSUE_T = max(
+                            ISSUE_T = max(
                                 self.ClusterList[this_clusterid].report_fb_submit_t(),
                                 self.ClusterList[this_clusterid].report_wb_submit_t(),
+                                SUBMIT_T,  # for VMM
                             )
                             SUBMIT_T = self.ClusterList[this_clusterid].run_query(
-                                this_subquery, TC_ISSUE_T
+                                this_subquery, ISSUE_T
                             )
                         if isinstance(this_subquery, QR.QueryExcuteOnVPU):
+                            if this_subquery.dfmod == "PostProcess":
+                                this_clusterid = used_cluster_id[-1]
                             ISSUE_T = SUBMIT_T
                             SUBMIT_T = self.ClusterList[this_clusterid].run_query(
                                 this_subquery, ISSUE_T
@@ -168,9 +174,17 @@ class MoraxChip:
                             )
                         if isinstance(this_subquery, QR.QueryExcuteOnNVTC):
                             if re.search(this_subquery.dfmod, "LUT"):
-                                SUBMIT_T = self.ClusterList[
+                                ISSUE_T = SUBMIT_T
+                                SUBMIT_T_0 = self.ClusterList[
                                     this_subquery.clusterid
                                 ].run_query(this_subquery, ISSUE_T)
+                                SUBMIT_T = (
+                                    SUBMIT_T_0
+                                    if isinstance(
+                                        subquerybulk[q_sub_idx + 1], QR.QueryExcuteOnVPU
+                                    )
+                                    else SUBMIT_T
+                                )
                             if re.search(this_subquery.dfmod, "Xbar"):
                                 ISSUE_T = SUBMIT_T
                                 SUBMIT_T_0 = max(
@@ -191,9 +205,14 @@ class MoraxChip:
 
 
 def schedule_a_cluster(
-    _querylist: list, _clusterlist: list, _layerqueryclass: QR.LayerQuery
+    _querylist: list,
+    _clusterlist: list,
+    _layerqueryclass: QR.LayerQuery,
+    layer_issue_t,
 ) -> int:
     # TODO: Update greedy algo to more advanced rule
+    # layer_issue_t
+    # ERR, NOT CONSIDER MEMORY SUBMIT TIME
     for q in _querylist:
         if isinstance(q, QR.QueryBuffer):
             continue

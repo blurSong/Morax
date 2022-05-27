@@ -609,6 +609,8 @@ class Memonitor:
     def hook1_cbr(
         self, _clusterid: int, _bulk: DataBulk, _chip_clusterlist: list,
     ):
+        if _bulk.bulksizebyte == 0:
+            return []
         ExtraQueryList = []
         note = _bulk.modelname + "_" + str(_bulk.layerindex) + "_" + _bulk.datatype
         tok, _ = self.search_note(note)

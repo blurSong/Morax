@@ -5,6 +5,7 @@
 
 
 from ast import Assign
+from dbm import _Database
 from sqlite3 import DataError
 import queue
 import sys
@@ -1011,6 +1012,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
     # go
     if layertype == LLT.Linear or layertype == LLT.VMM:
         # for: M N B
+        # (R RRR EEEE)
         M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.PEArraySize)
         N = math.ceil(_layerclass.col_dim * 1.0 / onetcsize)
         N_tail = _layerclass.col_dim % onetcsize
@@ -1043,7 +1045,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             )
             qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
             SubQueryList.append(copy.deepcopy(qrf))
-            # make right op bulk
+            # make right op bulk, on tc size
             for n in range(N):
                 wbulkscratch = {}
                 datatype = "MAT"
@@ -1091,11 +1093,15 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         tcbulksize,
                     )
                     SubQueryList.append(copy.deepcopy(qe))
+                SubQueryList.append(VritualQuerySeparator())
         # make vpu query after all tc exe
-        # add QV
-        qsep = VritualQuerySeparator()
-        SubQueryList.append(qsep)
         for b in range(B):
+            vbulk = DataBulk(_modelname, _index, "VEC", 0, {"B": b, "M": 0},)
+            SubQueryList.append(
+                QueryBuffer(
+                    copy.deepcopy(QueryBuffer(vbulk, BO.Read, CC.FeatureBuffer, CC.VPU))
+                )
+            )
             vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
             qv = QueryExcuteOnVPU(
                 _layerclass,
@@ -1115,6 +1121,8 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             )
             qw = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
             SubQueryList.append(copy.deepcopy(qw))
+        SubQueryList.append(VritualQuerySeparator())
+
         # End for
 
     if layertype == LLT.CONV:
@@ -1192,6 +1200,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             assigned_pearray += MoraxConfig.PEArrayNum
         # End spcify
         # Make Bulk
+        # (R (REW))
         for taskid in range(TSK):
             tasksize_listoftup = listof_tasksize_listoftup[taskid]
             ofbulkscratch = listof_scratchdict[taskid]
@@ -1315,6 +1324,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.DWCONV:
@@ -1495,6 +1505,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.TRCONV:
@@ -1663,6 +1674,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.NGCONV:
@@ -1859,6 +1871,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     )
                     qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                     SubQueryList.append(copy.deepcopy(qw))
+                SubQueryList.append(VritualQuerySeparator())
             # End for
 
     if layertype == LLT.Residual or layertype == LLT.MADD:
@@ -1930,6 +1943,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             assigned_pearray += MoraxConfig.PEArrayNum
         # End spcify
         # Make Bulk
+        # (RREW)
         for taskid in range(TSK):
             tasksize_listoftup = listof_tasksize_listoftup[taskid]
             bulkscratch = listof_scratchdict[taskid]
@@ -1996,6 +2010,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.Batchnorm:
@@ -2062,6 +2077,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             listof_scratchdict.append(copy.deepcopy(bulkscratch))
             assigned_pearray += MoraxConfig.PEArrayNum
         # End spcify
+        # [(L)(REW)]
         lut_taskindex = -1
         for taskid in range(TSK):
             tasksize_listoftup = listof_tasksize_listoftup[taskid]
@@ -2122,6 +2138,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == LLT.Layernorm:
@@ -2184,6 +2201,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             assigned_pearray += MoraxConfig.PEArrayNum
         # End spcify
         # Make bulk
+        # [L(REW)]
         lut_taskindex = -1
         for bat in range(B):
             # Make LUT
@@ -2204,7 +2222,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 lutadress[2],
             )
             SubQueryList.append(copy.deepcopy(qlut))
-            for taskid in range(TSK):
+            for taskid in range(TSK):  # ok, tsk size various within one bulk
                 tasksize_listoftup = listof_tasksize_listoftup[taskid]
                 bulkscratch = listof_scratchdict[taskid]
                 bulkscratch["B"] = bat
@@ -2242,6 +2260,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
             # End for
 
     if layertype == LLT.GEMM:
@@ -2304,7 +2323,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             assigned_pearray += MoraxConfig.PEArrayNum
         # End spcify
         # Make GEMM innerplace Bulk
-        # MNB
+        # MNB, [R/ (R/REW)]
         for taskid in range(TSK):
             tasksize_listoftup = listof_tasksize_listoftup[taskid]
             obulkscratch = listof_scratchdict[taskid]
@@ -2407,6 +2426,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 qw = QueryBuffer(wbbulk, BO.Write, CC.TensorCore, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qw))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
     # End CMOS
     return SubQueryList
@@ -2423,6 +2443,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
         B = _batch
         C = _layerclass.channel
         ofsize = _layerclass.feature_size / _layerclass.kernel_size
+        # [REW]
         for bat in range(B):
             for ch in range(C):
                 # rf
@@ -2460,12 +2481,14 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 wbbulk = DataBulk(_modelname, _index, datatype, wbs, wbulkscratch,)
                 qwb = QueryBuffer(wbbulk, BO.Write, CC.VPU, CC.FeatureBuffer)
                 SubQueryList.append(copy.deepcopy(qwb))
+            SubQueryList.append(VritualQuerySeparator())
         # End for
 
     if layertype == NLT.Softmax1D or NLT.Softmax2D:
         B = _batch
         L = 1 if layertype == NLT.Softmax1D else _layerclass.row_dim
         V = _layerclass.v_dim if layertype == NLT.Softmax1D else _layerclass.col_dim
+        # [REE(L)LEW]
         for bat in range(B):
             for line in range(L):
                 # read

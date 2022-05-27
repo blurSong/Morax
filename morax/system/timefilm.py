@@ -13,7 +13,10 @@ import math
 import copy
 from enum import Enum
 from collections import UserList
+
+from sympy import im
 from morax.system.interface import VO
+from morax.system.config import MoraxConfig
 
 int64 = np.int64
 
@@ -48,3 +51,27 @@ class TimeFilm(UserList):
             _stamp.submit_t = _stamp.issue_t + _stamp.span
         this_stamp = copy.deepcopy(_stamp)
         self.append(this_stamp)
+
+    def append_stamp_bufferver(self, _stamp: TimeStamp):
+        # Added 0521 for OOO EXE
+        if re.search("read", _stamp.label):
+            for tidx in range(len(self) - 1, -1, -1):
+                if re.search("write", self[tidx].label):
+                    continue
+                elif re.search("read", self[tidx].label):
+                    if self[tidx].submit_t >= _stamp.issue_t:
+                        _stamp.issue_t = self[tidx].submit_t + 1
+                        _stamp.submit_t = _stamp.issue_t + _stamp.span
+                        break
+        elif re.search("write", _stamp.label):
+            for tidx in range(len(self) - 1, -1, -1):
+                if re.search("read", self[tidx].label):
+                    continue
+                elif re.search("write", self[tidx].label):
+                    if self[tidx].submit_t >= _stamp.issue_t:
+                        _stamp.issue_t = self[tidx].submit_t + 1
+                        _stamp.submit_t = _stamp.issue_t + _stamp.span
+                        break
+        this_stamp = copy.deepcopy(_stamp)
+        self.append(this_stamp)
+        return
