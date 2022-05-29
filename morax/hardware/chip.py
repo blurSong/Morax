@@ -200,7 +200,19 @@ class MoraxChip:
                                     )
                                     else SUBMIT_T
                                 )
-
+            # END SUBQUERY
+            # 2 hook3
+            for h_idx in _modelDAG.fromVertexDict[thisrun_index]:
+                _monitor.hook3_caf(
+                    h_idx,
+                    _modelDAG.LayerQueryClassDict[thisrun_index],
+                    self.ClusterList,
+                )
+            # 3 check end
+            if not CandidateLayerList:
+                break
+        # END WHILE
+        print("[Morax] Finish.")
         return
 
 

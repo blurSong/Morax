@@ -670,15 +670,22 @@ class Memonitor:
 
     # hook3, check input after one layer finish
     def hook3_caf(
-        self, _note, _clusterlist: list,
+        self, pre_index, _pre_layerclass, _clusterlist: list,
     ):
-        self.monitor[_note]["token"] -= 1
-        if self.monitor[_note]["token"] == 0:
-            worf = self.monitor[_note]["worf"]
-            _, loclist = self.search_note(_note)
+        note = (
+            _pre_layerclass.modelname
+            + "_"
+            + str(pre_index)
+            + "_"
+            + get_datatype(_pre_layerclass)
+        )
+        self.monitor[note]["token"] -= 1
+        if self.monitor[note]["token"] == 0:
+            worf = self.monitor[note]["worf"]
+            _, loclist = self.search_note(note)
             for loc in loclist:
                 if worf == ClusterComponent.WeightBuffer:
-                    _clusterlist[loc].WeightBuffer.release(_note)
+                    _clusterlist[loc].WeightBuffer.release(note)
                 elif worf == ClusterComponent.FeatureBuffer:
-                    _clusterlist[loc].FeatureBuffer.release(_note)
-            self.eliminate_note(_note)
+                    _clusterlist[loc].FeatureBuffer.release(note)
+            self.eliminate_note(note)
