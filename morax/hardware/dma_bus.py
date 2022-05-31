@@ -40,9 +40,6 @@ class DRAMReadActionDict:
         )
 
 
-# todo update stratchpad
-
-
 class RingBus:
     def __init__(self) -> None:
         self.TimeFilm = TimeFilm()

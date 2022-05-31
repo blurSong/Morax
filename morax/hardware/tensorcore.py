@@ -65,7 +65,7 @@ class PEArray:
             runtime = 1 + M + N + 1
         # LLT.CONV
         elif _q_pearray["execution"] == TCExe[1]:
-            assert _q_pearray["dfmod"] == "OS"  # todo: for now, no CS
+            assert _q_pearray["dfmod"] == "OS"  # TODO: ADD Syst dataflow for conv
             M = _q_pearray["subtasksize"][0]
             N = _q_pearray["subtasksize"][1]
             K = _layerclass.kernel_size

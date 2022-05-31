@@ -4,9 +4,7 @@
 # FrontEnd API
 
 import os
-import re
-import sys
-import numpy as np
+import random
 import copy
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,6 +24,7 @@ from morax.model.layer import (
     mxLTD,
     mxNTD,
 )
+from morax.system.config import MoraxConfig
 
 
 def get_layer_scratchdict(_layerclass):
@@ -65,8 +64,8 @@ def get_layer_scratchdict(_layerclass):
         scratchpad_dict = {"M": _layerclass.m_dim, "N": _layerclass.n_dim}
     elif layertype in [LLT.MADD, LLT.Layernorm]:
         scratchpad_dict = {"M": _layerclass.row_dim, "N": _layerclass.col_dim}
-    elif layertype == LLT.CONCAT:  # todo
-        scratchpad_dict = {}
+    # elif layertype == LLT.CONCAT:
+    #    scratchpad_dict = {}
     elif layertype == NLT.Pooling:
         scratchpad_dict = {
             "C": _layerclass.channel,
@@ -154,8 +153,22 @@ def get_weight_scratchdict(_layerclass):
 
 def get_lookup_adress(_index, _chn):
     # NOTE fake func because no real data
-    # TODO
-    return (1, 1, [2, 3])
+    # _nvtcid: int, _clusterid: int, _sliceidlist: Anyc
+    random.seed(_index)
+    nvtcid = (
+        random.randint(0, MoraxConfig.NVTCNum - 1) + _chn % MoraxConfig.NVTCNum
+    ) % MoraxConfig.NVTCNum
+    clusterid = (
+        random.randint(0, MoraxConfig.ClusterNum - 1) + _chn % MoraxConfig.ClusterNum
+    ) % MoraxConfig.ClusterNum
+    sliceidlist = [
+        (
+            random.randint(0, MoraxConfig.RRAMSliceNum - 1)
+            + _chn % MoraxConfig.RRAMSliceNum
+        )
+        % MoraxConfig.RRAMSliceNum
+    ]
+    return (nvtcid, clusterid, sliceidlist)
 
 
 def read_morax_csv(_modelpath, _modelname, _isnorm=False):
@@ -304,7 +317,7 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
                 for attentionidx in range(attentionlayer):
                     model_dag.add_layer(
                         outofrange_idx + attentionidx + hd * attentionlayer,
-                        True,  # TODO: Softmax False
+                        True,  # NOTE Softmax is False
                     )
             concattuple = (
                 idx - attentionlayer,

@@ -33,12 +33,11 @@ from morax.frontend.api import (
     get_lookup_adress,
 )
 
-# TODO add VritualQuerySeparator to all compfunc
 
 # [bulk]
 # indicate the data form of input and weight
-# bulkfrom = (part or whole) feature: NCHW  weight: KCRS  MVM & GEMM: TODO
-# dataname = W or F or TODO
+# bulkfrom = (part or whole) feature: NCHW  weight: KCRS  MVM & GEMM:
+# dataname = W or F or
 # bulklabel = modelname_'L'+layeridx_'dataname'+bulkidx_bulksizeByte_bulkfrom
 
 # [task]
@@ -46,7 +45,6 @@ from morax.frontend.api import (
 # taskform = (part or whole) batchN outputchannelC heighH widthW  MVM: outputdimO batchN GEMM: heightH widthW batchN
 # CONV
 # RRAM: CHWN onefeaturebyonefeature    OS: HWNC onechannelbyonechannel (FOR MAX KERNEL REUSE)
-# TODO
 # tasklabel = modelname_'L'+layeridx_'T'+taskidx_taskform
 
 
@@ -355,7 +353,7 @@ def generate_queries(
             q = LayerQuery(
                 idx,
                 _batch,
-                _modelList[oidx],  # TODO: CHANGE INDEX TUPLE of layerclass
+                _modelList[oidx],  # TODO: CHANGE INDEX TUPLE of Layerclass
                 _modelDAG.LayerAssignmentDict[idx],
                 len(_modelDAG.fromVertexDict[idx]),
                 len(_modelDAG.toVertexDict[idx]),

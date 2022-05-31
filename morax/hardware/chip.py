@@ -46,7 +46,7 @@ class MoraxChip:
         CandidateLayerList = [-1]
         while True:
             # 0.1 choose one layer, report layer index and issue_time
-            # todo
+            # TODO OL.schedule_one_layer
             thisrun_index, LAYER_ISSUE_TIME = OL.schedule_one_layer(
                 CandidateLayerList, _modelDAG, self.ClusterList
             )
@@ -222,8 +222,7 @@ def schedule_a_cluster(
     _layerqueryclass: QR.LayerQuery,
     layer_issue_t,
 ) -> int:
-    # TODO: Update greedy algo to more advanced rule
-    # layer_issue_t
+    # TODO: Update greedy algo to a more advanced rule
     # ERR, NOT CONSIDER MEMORY SUBMIT TIME
     for q in _querylist:
         if isinstance(q, QR.QueryBuffer):
@@ -262,11 +261,20 @@ def spcify_querybulk(_query_list: list):
     """
     A q bulk usually is: R, R E W, R E W,...
     A nvtc bulk is R (R), EEEEEEE, V W
-    TODO 0520: Use VritualQuerySeparator to spcify bulk
+    0520: Use VritualQuerySeparator to spcify bulk
     """
     assert isinstance(_query_list[0], QR.QueryBuffer)
     assert _query_list[0].execution == IF.BO.Read
     this_querybulk = []
+    while True:
+        this_querybulk.append(copy.deepcopy(_query_list.pop(index=0)))
+        if len(_query_list) == 0:
+            break
+        elif isinstance(_query_list[0], QR.VritualQuerySeparator):
+            _query_list.pop(index=0)
+            break
+
+    """
     EXE_FLAG = 0
     while True:
         this_querybulk.append(copy.deepcopy(_query_list.pop(index=0)))
@@ -282,4 +290,5 @@ def spcify_querybulk(_query_list: list):
             elif isinstance(_query_list[0], QR.QueryBuffer):
                 if _query_list[0].execution == IF.BO.Read:
                     break
+    """
     return this_querybulk

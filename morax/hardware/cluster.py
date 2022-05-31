@@ -58,7 +58,7 @@ class MoraxCluster:
                 raise AttributeError
             """
             if this_query.execution == BO.Read and ret_t == -1:
-                # TODO: Apply dram or inter-cluter query
+                # Need to Apply dram or inter-cluter query
                 return -1
             """
         elif isinstance(this_query, Q.QueryExcuteOnNVTC):
@@ -74,7 +74,7 @@ class MoraxCluster:
                     ret_t = self.TensorCoreList[tcid].run_query(this_query, _issue_t)
                     break
             if ret_t == 0:  # all busy
-                # TODO: Apply query on other cluter
+                # Apply query on other cluter
                 return -1
             """
         elif isinstance(this_query, Q.QueryExcuteOnVPU):
@@ -84,7 +84,7 @@ class MoraxCluster:
             ):
                 ret_t = self.VPU.run_query(this_query, _issue_t)
             else:
-                # TODO: Apply query on other cluter
+                # Apply query on other cluter
                 ret_t = self.VPU.run_query(this_query, _issue_t)
         elif isinstance(this_query, Q.QueryExcuteOnSMU):
             ret_t = self.SMU.run_query(this_query, _issue_t)

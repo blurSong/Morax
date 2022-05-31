@@ -3,6 +3,7 @@
 # Author: Tao Song.
 # Last modification: 0327
 
+from pprint import pprint
 import numpy as np
 import subprocess as SP
 import multiprocessing as MP
@@ -104,10 +105,12 @@ class ScratchpadBuffer:
     def write_buffer(self, _databulk: DataBulk):
         if self.WaterLineByte + _databulk.sizebyte > self.CapacityByte:
             # TODO
-            raise Exception("Buffer overflowed.")
+            # raise Exception("Buffer overflowed.")
+            print(("Buffer overflowed."))
         elif _databulk.label in self.Scratchpad:
             # TODO
-            raise Exception("Buffer duplicated.")
+            # raise Exception("Buffer duplicated.")
+            print(("Buffer duplicated."))
         else:
             # self.LabelSet.add(_databulk.label)
             self.Scratchpad.writeANote(_databulk)
