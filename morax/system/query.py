@@ -849,6 +849,7 @@ def compileRRAM(
         RRRR EEEE
         """
         # idxtup = _layerclass.input_indecies_tuple
+        """
         if IIright == 0:
             iidx = IIleft
             m_dim = _layerclass.k_dim
@@ -856,6 +857,17 @@ def compileRRAM(
             n_dim = _layerclass.m_dim
         else:
             iidx = IIright
+            m_dim = _layerclass.m_dim
+            k_dim = _layerclass.k_dim
+            n_dim = _layerclass.n_dim
+        """  # 0605
+        if IIleft == 0:
+            iidx = IIright
+            m_dim = _layerclass.n_dim
+            k_dim = _layerclass.k_dim
+            n_dim = _layerclass.m_dim
+        else:
+            iidx = IIleft
             m_dim = _layerclass.m_dim
             k_dim = _layerclass.k_dim
             n_dim = _layerclass.n_dim
