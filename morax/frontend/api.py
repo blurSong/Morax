@@ -10,15 +10,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import subprocess as SP
+from sqlite3 import DataError
 
-from torch import Def
+
 import morax.model.layer as Lyr
 import morax.model.model as Model
 from morax.frontend.csvparser import apdidx2_is_index2
 from morax.model.layer import (
     LinearLayerType as LLT,
     NonlinearLayerType as NLT,
-    Softmax1D,
     mxLCD_CNN,
     mxLCD_GEMM,
     mxLTD,
@@ -403,3 +403,29 @@ def get_idx_from_concat(idx, concatlist):
         else:
             continue
     return oidx
+
+
+def add_layerclass_to_dag(
+    _modelDAG: Model.ModelDAG, _modelList: Model.ModelList, _concatlist: list
+):
+    modeltype = _modelDAG.modeltype
+    layernumL = _modelList.layernum
+    layernumG = _modelDAG.layernum
+    assert layernumL == len(_modelList)
+    if layernumL != layernumG and modeltype != Model.ModelType.MHATTENTION:
+        print(
+            "[Morax][System] generate queries fatal, layernum of List({}) and DAG({}) are different.".format(
+                layernumL, layernumG
+            )
+        )
+        raise DataError
+    if _concatlist:
+        _modelDAG.ConcatList = copy.deepcopy(_concatlist)
+    for idx in _modelDAG.LayerIndexList:
+        assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
+        if idx < len(_modelList):
+            _modelDAG.LayerClassDict[idx] = _modelList[idx]
+        else:
+            oidx = get_idx_from_concat(idx, _concatlist)
+            _modelDAG.LayerClassDict[idx] = _modelList[oidx]
+    return

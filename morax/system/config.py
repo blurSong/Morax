@@ -36,6 +36,7 @@ class MoraxConfig:
     # [System]
     PrecisionBits = 16
     FracBits = 5
+    RRAMCellBits = 2
 
 
 class HWParam:

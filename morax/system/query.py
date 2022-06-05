@@ -319,46 +319,19 @@ class LayerQuery:
 
 
 def generate_queries(
-    _modelList: ModelList,
-    _modelDAG: ModelDAG,
-    _moraxchip: MoraxChip,
-    concatlist=[],
-    _batch=1,
+    _modelDAG: ModelDAG, _moraxchip: MoraxChip, _batch=1,
 ):
-    modeltype = ModelDAG.modeltype
-    modelname = ModelDAG.modelname
-    layernumL = _modelList.layernum
-    layernumG = _modelDAG.layernum
-    if layernumL != layernumG and modeltype != ModelType.MHATTENTION:
-        print(
-            "[Morax][System] generate queries fatal, layernum of List({}) and DAG({}) are different.".format(
-                layernumL, layernumG
-            )
-        )
-        raise DataError
     totalquery = 0
     for idx in _modelDAG.LayerIndexList:
-        assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
-        if idx < len(_modelList):
-            q = LayerQuery(
-                idx,
-                _batch,
-                _modelList[idx],
-                _modelDAG.LayerAssignmentDict[idx],
-                len(_modelDAG.fromVertexDict[idx]),
-                len(_modelDAG.toVertexDict[idx]),
-            )
-        else:
-            oidx = get_idx_from_concat(idx, concatlist)
-            q = LayerQuery(
-                idx,
-                _batch,
-                _modelList[oidx],  # TODO: CHANGE INDEX TUPLE of Layerclass
-                _modelDAG.LayerAssignmentDict[idx],
-                len(_modelDAG.fromVertexDict[idx]),
-                len(_modelDAG.toVertexDict[idx]),
-            )
-        q.compile(modelname, _moraxchip, concatlist)
+        q = LayerQuery(
+            idx,
+            _batch,
+            _modelDAG.LayerClassDict[idx],
+            _modelDAG.LayerAssignmentDict[idx],
+            len(_modelDAG.fromVertexDict[idx]),
+            len(_modelDAG.toVertexDict[idx]),
+        )  # TODO: CHANGE INDEX TUPLE of Layerclass
+        q.compile(_modelDAG.modelname, _moraxchip, _modelDAG.ConcatList)
         _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
         totalquery += 1
     assert totalquery == _modelDAG.layernum

@@ -27,8 +27,12 @@ class ModelDAG:
         self.LayerIndexList = []
         self.toVertexDict = {}
         self.fromVertexDict = {}
+
+        self.LayerClassDict = {}
         self.LayerAssignmentDict = {}
         self.LayerQueryClassDict = {}
+
+        self.ConcatList = []
 
         self.assigned = False
         self.compiled = False
