@@ -410,7 +410,7 @@ def compileRRAM(
                             _chip.ClusterList[clstid]
                             .nvTensorCoreList[nvtcid]
                             .RRAMSliceObjList[info]
-                            .layerinfo[1]
+                            .layerinfo[2]
                         )
                     bulkinfo = []
                     for tup in mapinfo:
@@ -891,7 +891,7 @@ def compileRRAM(
                                 _chip.ClusterList[clstid]
                                 .nvTensorCoreList[nvtcid]
                                 .RRAMSliceObjList[info]
-                                .layerinfo[1]
+                                .layerinfo[2]
                             )
                         bulkinfo = []
                         for tup in mapinfo:

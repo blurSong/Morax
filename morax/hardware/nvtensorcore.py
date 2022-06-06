@@ -89,8 +89,10 @@ class RRAMSlice:
         self.layerinfo = (-1, (0, 0))
         self.mapped = False
 
-    # info: (layerid, mappingmap(rowid, colid))
-    def map_slice(self, _layerinfo: tuple(int, (int, int)), _islut, _mvmrow, _mvmcol):
+    # info: (modelname, layerid, mappingmap(rowid, colid))
+    def map_slice(
+        self, _layerinfo: tuple(int, (int, int)), _mvmrow, _mvmcol, _islut=True,
+    ):
         self.mapped = True
         self.layerinfo = _layerinfo
         self.EightXbar["mvmrow"] = _mvmrow
@@ -181,6 +183,14 @@ class nvTensorCore:
                 _mvmsizetuple_list[sid][0],
                 _mvmsizetuple_list[sid][1],
             )
+
+    def map_a_slice(self, _sliceid, _layerinfotuple, _islut_list, _mvmsizetuple_list):
+        self.RRAMSliceObjList[_sliceid].map_slice(
+            _layerinfotuple_list[si_sliceidd],
+            _islut_list[_sliceid],
+            _mvmsizetuple_list[sid][0],
+            _mvmsizetuple_list[sid][1],
+        )
 
     def run_query(self, _qclass_nvtc: QueryExcuteOnNVTC, _issue_t: int):
         query_nvtc = copy.deepcopy(_qclass_nvtc)
