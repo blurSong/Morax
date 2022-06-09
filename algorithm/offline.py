@@ -2,7 +2,9 @@ import math
 import morax.model.layer as LYR
 
 
-def calc_xbars(_layerclass: LYR.LinearLayer, _xbarsize: tuple, _bars_per_word=8):
+def calc_xbars(
+    _layerclass: LYR.LinearLayer, _xbarsize: tuple, _bars_per_word=8, _returnRC=False
+):
     layertype = _layerclass.layer_type
     row_l, col_l = 0, 0
     dup = _bars_per_word
@@ -28,12 +30,13 @@ def calc_xbars(_layerclass: LYR.LinearLayer, _xbarsize: tuple, _bars_per_word=8)
         else:
             row_l = _layerclass.k_dim
             col_l = _layerclass.n_dim
-    xbars = (
-        dup
-        * math.ceil(row_l * 1.0 / _xbarsize[0])
-        * math.ceil(col_l * 1.0 / _xbarsize[1])
-    )
-    return xbars
+    row_par = math.ceil(row_l * 1.0 / _xbarsize[0])
+    col_par = math.ceil(col_l * 1.0 / _xbarsize[0])
+    xbars = dup * row_par * col_par
+    if _returnRC:
+        return xbars, row_l, col_l
+    else:
+        return xbars
 
 
 def schedule_rram_layers(_modelDAG, xbar_num, xbar_size: tuple, bars_per_word):

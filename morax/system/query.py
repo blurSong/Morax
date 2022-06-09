@@ -882,6 +882,7 @@ def compileRRAM(
         vpu_taskindex = -1
         for bat in range(_batch):
             for vf in range(V):
+                # match Model info to Chip info
                 for clstid, nvtclist in _doclotnsl.items():
                     for nvtctup in nvtclist:
                         (nvtcid, sliceidlist) = nvtctup

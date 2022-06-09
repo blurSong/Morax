@@ -95,9 +95,20 @@ class NonlinearLayerType(Enum):
 
 
 class Layer:
-    def __init__(self, _layername, _layerindex) -> None:
+    def __init__(self, _layername: str, _layerindex) -> None:
         self.layer_name = _layername
         self.layer_index = _layerindex
+
+    def change_layerinfo(self, _newindex):
+        end = 0
+        for i in range(len(self.layer_name) - 1, 0):
+            if self.layer_name[i].isdigit():
+                continue
+            else:
+                end = i
+                break
+        self.layer_name = self.layer_name[: end + 1] + str(_newindex)
+        self.layer_index = _newindex
 
 
 class LinearLayer(Layer):

@@ -424,8 +424,10 @@ def add_layerclass_to_dag(
     for idx in _modelDAG.LayerIndexList:
         assert idx in _modelDAG.fromVertexDict and idx in _modelDAG.toVertexDict
         if idx < len(_modelList):
-            _modelDAG.LayerClassDict[idx] = _modelList[idx]
+            _modelDAG.LayerClassDict[idx] = copy.deepcopy(_modelList[idx])
         else:
             oidx = get_idx_from_concat(idx, _concatlist)
-            _modelDAG.LayerClassDict[idx] = _modelList[oidx]
+            tmplayerclass = copy.deepcopy(_modelList[oidx])
+            tmplayerclass.change_layerinfo(idx)
+            _modelDAG.LayerClassDict[idx] = tmplayerclass
     return
