@@ -1,10 +1,6 @@
 import copy
-import re
-import sys
-import os
 from enum import Enum
 from collections import UserDict, UserList
-from pyrsistent import T
 import morax.model.layer as Lyr
 
 
@@ -14,6 +10,24 @@ class ModelType(Enum):
     RNN = 2
     LSTM = 3
     MHATTENTION = 4
+
+
+CNNModelList = [
+    "alexnet",
+    "vgg16",
+    "vgg19",
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnext50",
+    "mobilenet_v2",
+    "shufflenet_v2",
+    "unet",
+]
+
+MLPModelList = []
+
+AttentionModelList = []
 
 
 class ModelDAG:

@@ -1,1 +1,9 @@
 .vscode/
+morax/__pycache__/
+morax/cost/__pycache__/
+morax/frontend/__pycache__/
+morax/hardware/__pycache__/
+morax/model/__pycache__/
+morax/system/__pycache__/
+
+

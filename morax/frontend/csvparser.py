@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import subprocess as SP
 from torch._C import CONV_BN_FUSION
-from morax.model.layer import MXLCD, MXLTD, MXNTD
+from morax.model.layer import morax_linearlayer_type_dicts as MXLTD
 
 
 def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
@@ -25,8 +25,12 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
     else:
         moracsvname = _modelname + ".csv"
         moraxcsvname = _modelname + "_pl.csv"
-    mora_csv_path = os.path.abspath(os.path.join(_modelpath, moracsvname))
-    morax_csv_path = os.path.abspath(os.path.join(_modelpath, moraxcsvname))
+    mora_csv_path = os.path.abspath(
+        os.path.join(_modelpath, _modelname + "/" + moracsvname)
+    )
+    morax_csv_path = os.path.abspath(
+        os.path.join(_modelpath, _modelname + "/" + moraxcsvname)
+    )
     model_df = pd.read_csv(mora_csv_path)
     # 1. refill IDX and APD
     # 2. refill RP and add pooling layer
@@ -52,7 +56,7 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
                 "IDX": -1,
                 "APD": 0,
             }
-            poolingrow_df = pd.DataFrame(poolingrow)
+            poolingrow_df = pd.DataFrame(poolingrow, index=[idx + 1])
             model_df = insert_a_row(model_df, poolingrow_df, idx + 1)
             model_df.at[idx, "RP"] = 1
         if MXLTD[layer["TYP"]] == "Linear" and layer["APD"] > 1:
@@ -68,7 +72,7 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
                 "IDX": -1,
                 "APD": 0,
             }
-            poolingrow_df = pd.DataFrame(poolingrow)
+            poolingrow_df = pd.DataFrame(poolingrow, index=[idx + 1])
             model_df = insert_a_row(model_df, poolingrow_df, idx)
             model_df.at[idx, "APD"] = 1
     model_df.to_csv(morax_csv_path, index=False)
@@ -78,8 +82,12 @@ def add_pooling_to_csv(_modelpath, _modelname, _isbn=False):
 
 def remove_bn_to_csv(_modelpath, _model):
     # remove bn layer and reconstruct csv for 2 simulators
-    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_norm.csv"))
-    model_csv_path_nobn = os.path.abspath(os.path.join(_modelpath, _model + ".csv"))
+    model_csv_path = os.path.abspath(
+        os.path.join(_modelpath, _model + "/" + _model + "_norm.csv")
+    )
+    model_csv_path_nobn = os.path.abspath(
+        os.path.join(_modelpath, _model + "/" + _model + ".csv")
+    )
     model_df = pd.read_csv(model_csv_path)
     # 1. refill ReLU pooling to previous layer
     # 2. refill index to next layer
@@ -115,8 +123,12 @@ def remove_bn_to_csv(_modelpath, _model):
 
 def remove_ln_to_csv(_modelpath, _model):
     # remove bn layer and reconstruct csv for 2 simulators
-    model_csv_path = os.path.abspath(os.path.join(_modelpath, _model + "_norm.csv"))
-    model_csv_path_nobn = os.path.abspath(os.path.join(_modelpath, _model + ".csv"))
+    model_csv_path = os.path.abspath(
+        os.path.join(_modelpath, _model + "/" + _model + "_norm.csv")
+    )
+    model_csv_path_nobn = os.path.abspath(
+        os.path.join(_modelpath, _model + "/" + _model + ".csv")
+    )
     model_df = pd.read_csv(model_csv_path)
     # 1. refill ReLU pooling to previous layer
     # 2. refill index to next layer

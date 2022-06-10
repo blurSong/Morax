@@ -15,7 +15,6 @@ from sqlite3 import DataError
 
 import morax.model.layer as Lyr
 import morax.model.model as Model
-from morax.frontend.csvparser import apdidx2_is_index2
 from morax.model.layer import (
     LinearLayerType as LLT,
     NonlinearLayerType as NLT,

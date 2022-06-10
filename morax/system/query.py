@@ -254,10 +254,12 @@ class LayerQuery:
         # assignment:
         # listoftuple_clstid_nvtcid_sliceidlist
         # default []
+        """
         if isinstance(self.assignment, list):
             assert mapper.check_mapping_with_query(
                 self.layerclass.layer_index
             ), "{}".format(self.layerclass.layer_name)
+        """
 
     def set_issue_t(self, _issue_t):
         assert _issue_t > 0
