@@ -87,7 +87,7 @@ class ModelDAG:
 
 class ModelList(UserList):
     def __init__(self, _modelname, _modeltype) -> None:
-        super().__init_()
+        super().__init__()
         self.modelname = _modelname
         self.modeltype = _modeltype
         self.layernum = 0

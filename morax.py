@@ -2,12 +2,14 @@
 # Author: Tao Song.
 # Last modification: 0316
 
+from ast import Return
 import os
 import sys
 import argparse
 from typing import Container
 import re
 from unittest import result
+from docutils import DataError
 import numpy as np
 import pandas as pd
 import subprocess as SP
@@ -18,6 +20,8 @@ import math
 
 from morax.frontend import api, csvparser
 from morax.model import model
+from morax.hardware import chip
+from morax.system import memonitor, query, mapper
 
 
 def set_path():
@@ -45,6 +49,7 @@ def set_path():
 
 def set_parser():
     parser = argparse.ArgumentParser(description="Morax simulator parser")
+    parser.add_argument("--batch", type=int, default=1)
     parser.add_argument(
         "--scenario", type=str, default="sm", choices=["sm", "mm", "cs"]
     )  # single model multi-model context-switching
@@ -83,23 +88,67 @@ def set_parser():
         ],
     )
     parser.add_argument("--store_trace", action="store_true", default=False)
-    parser.add_argument("--use_normal_model", action="store_true", default=False)
+    parser.add_argument("--use_normal_model", action="store_true", default=True)
     return parser
+
+
+def get_modeltype(_modelname):
+    if _modelname in model.CNNModelList:
+        model_type = model.ModelType.CNN
+    elif _modelname in model.MLPModelList:
+        model_type = model.ModelType.MLP
+    elif _modelname in model.AttentionModelList:
+        model_type = model.ModelType.MHATTENTION
+    return model_type
 
 
 if __name__ == "__main__":
     parser = set_parser()
     args = parser.parse_args()
     set_path()
+
     # csv pre-process
     model_path = os.path.abspath(os.path.join(data_path, "model"))
     result_path = os.path.abspath(os.path.join(data_path, "result_path"))
+    model_type = get_modeltype(args.model)
     if not args.use_normal_model:
-        if args.model in model.CNNModelList:
+        if model_type == model.ModelType.CNN:
+            LUTEN = True
             csvparser.remove_bn_to_csv(model_path, args.model)
-        elif args.model in model.MLPModelList:
+        elif model_type == model.ModelType.MLP:
+            LUTEN = False
             csvparser.remove_bn_to_csv(model_path, args.model)
-        elif args.model in model.AttentionModelList:
+        elif model_type == model.ModelType.MHATTENTION:
+            LUTEN = True
             csvparser.remove_ln_to_csv(model_path, args.model)
     csvparser.add_pooling_to_csv(model_path, args.model, args.use_normal_model)
-    print("This")
+
+    # get data
+    layernum, model_nd = api.read_morax_csv(
+        model_path, args.model, args.use_normal_model
+    )
+    ModelDAG, model_list, concatlist = api.make_model(
+        args.model, model_type, layernum, model_nd
+    )
+    if concatlist:
+        api.add_layerclass_to_dag(ModelDAG, model_list, concatlist)
+
+    # init morax obj
+    MoraxChip = chip.MoraxChip()
+    MemMonitor = memonitor.Memonitor()
+    Mapper = mapper.Mapper(LUTEN)
+
+    # offline process and run
+    if args.scenario == "sm":
+        Mapper.map_single(ModelDAG, MoraxChip)
+        query.generate_queries(ModelDAG, MoraxChip, args.batch)
+        MoraxChip.invoke_morax(ModelDAG, MemMonitor)
+    elif args.scenario == "mm":
+        # TODO
+        Mapper.map_multi(ModelDAG, MoraxChip)
+    elif args.scenario == "cs":
+        # TODO
+        raise DataError
+
+    # post process
+    print("Here")

@@ -39,6 +39,7 @@ class MoraxChip:
             clst = cluster.MoraxCluster(clstid)
             self.ClusterList.append(copy.deepcopy(clst))
         self.MoraxTimeFilm = TF.TimeFilm()
+        print["[Morax][Hardware] chip initialized."]
 
     def invoke_morax(self, _modelDAG: ModelDAG, _monitor: MM.Memonitor):
         # RRAM:

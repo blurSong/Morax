@@ -175,7 +175,7 @@ def read_morax_csv(_modelpath, _modelname, _isnorm=False):
         csv = _modelname + "_norm.csv"
     else:
         csv = _modelname + ".csv"
-    morax_csv_path = os.path.abspath(os.path.join(_modelpath, csv))
+    morax_csv_path = os.path.abspath(os.path.join(_modelpath, _modelname + "/" + csv))
     model_df = pd.read_csv(morax_csv_path)
     model_nd = model_df.to_numpy()
     layernum = model_nd.shape[0]
@@ -388,7 +388,7 @@ def make_model(_model, _modeltype, _layernum, _model_nd):
     if _modeltype == Model.ModelType.MHATTENTION:
         return model_dag, model_list, concatlist
     else:
-        return model_dag, model_list
+        return model_dag, model_list, []
 
 
 def get_idx_from_concat(idx, concatlist):
