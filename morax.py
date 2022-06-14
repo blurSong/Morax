@@ -82,7 +82,7 @@ def set_parser():
         ],
     )
     parser.add_argument("--store_trace", action="store_true", default=False)
-    parser.add_argument("--use_non_normal_model", action="store_false", default=True)
+    parser.add_argument("--use_non_normal_model", action="store_true", default=False)
     return parser
 
 
@@ -105,32 +105,33 @@ if __name__ == "__main__":
     model_path = os.path.abspath(os.path.join(data_path, "model"))
     result_path = os.path.abspath(os.path.join(data_path, "result_path"))
     model_type = get_modeltype(args.model)
-    if args.use_non_normal_model:
-        if model_type == model.ModelType.CNN:
-            LUTEN = True
+    if model_type == model.ModelType.CNN:
+        LUT_EN_ = True
+        if args.use_non_normal_model:
             csvparser.remove_bn_to_csv(model_path, args.model)
-        elif model_type == model.ModelType.MLP:
-            LUTEN = False
+    elif model_type == model.ModelType.MLP:
+        LUT_EN_ = False
+        if args.use_non_normal_model:
             csvparser.remove_bn_to_csv(model_path, args.model)
-        elif model_type == model.ModelType.MHATTENTION:
-            LUTEN = True
+    elif model_type == model.ModelType.MHATTENTION:
+        LUT_EN_ = True
+        if args.use_non_normal_model:
             csvparser.remove_ln_to_csv(model_path, args.model)
-    csvparser.add_pooling_to_csv(model_path, args.model, args.use_normal_model)
+    csvparser.add_pooling_to_csv(model_path, args.model, not args.use_non_normal_model)
 
     # get data
     layernum, model_nd = api.read_morax_csv(
-        model_path, args.model, args.use_normal_model
+        model_path, args.model, not args.use_non_normal_model
     )
     ModelDAG, model_list, concatlist = api.make_model(
         args.model, model_type, layernum, model_nd
     )
-    if concatlist:
-        api.add_layerclass_to_dag(ModelDAG, model_list, concatlist)
+    api.add_layerclass_to_dag(ModelDAG, model_list, concatlist)
 
     # init morax obj
     MoraxChip = chip.MoraxChip()
     MemMonitor = memonitor.Memonitor()
-    Mapper = mapper.Mapper(LUTEN)
+    Mapper = mapper.Mapper(LUT_EN_)
 
     # offline process and run
     if args.scenario == "sm":

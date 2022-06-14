@@ -18,14 +18,15 @@ class Mapper:
             CFG.MoraxConfig.ClusterNum
             * CFG.MoraxConfig.NVTCNum
             * CFG.MoraxConfig.RRAMSliceNum
-            * CFG.MoraxConfig.RRAMXbarNum,
+            * CFG.MoraxConfig.RRAMXbarNum
         )
         self.rram_cap_byte = (
             self.xbar_num
             * CFG.MoraxConfig.RRAMXbarSize
             * (CFG.MoraxConfig.RRAMXbarSize - self.lut_row)
             * CFG.MoraxConfig.RRAMCellBits
-        ) / 8
+            / 8
+        )
         self.xbar_size = (
             CFG.MoraxConfig.RRAMXbarSize - self.lut_row,
             CFG.MoraxConfig.RRAMXbarSize,
