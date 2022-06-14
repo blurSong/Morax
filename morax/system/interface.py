@@ -8,7 +8,6 @@
 # OS: onechannelbyonechannel
 # Morax uses token to control scratchpad buffer hierachy
 
-from msilib.schema import Control
 from enum import Enum
 from morax.model.layer import LinearLayerType as LLT, NonlinearLayerType as NLT
 

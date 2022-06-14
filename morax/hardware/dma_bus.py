@@ -11,7 +11,7 @@ from morax.system.interface import TO, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from morax.system.config import MoraxConfig, HWParam
 from morax.system.query import QueryBuffer, QueryRingBus, QueryDMA
-from buffer import DataBulk
+from morax.hardware.buffer import DataBulk
 
 
 # read label, transfer bulk

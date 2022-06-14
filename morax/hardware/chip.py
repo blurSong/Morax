@@ -13,7 +13,6 @@ import multiprocessing as MP
 import copy
 import re
 
-from pyrsistent import T
 from regex import R
 
 import morax.system.interface as IF
@@ -25,18 +24,18 @@ import morax.system.schedule as SCH
 from morax.model.model import ModelDAG
 from algorithm import online as OL
 
-import dma_bus
-import cluster
+import morax.hardware.dma_bus as DMA_BUS
+import morax.hardware.cluster as CLST
 
 
 class MoraxChip:
     def __init__(self) -> None:
-        self.DMA = dma_bus.DMA()
-        self.RingBus = dma_bus.RingBus()
+        self.DMA = DMA_BUS.DMA()
+        self.RingBus = DMA_BUS.RingBus()
         self.ClusterNum = CFG.MoraxConfig.ClusterNum
         self.ClusterList = []
         for clstid in range(self.ClusterNum):
-            clst = cluster.MoraxCluster(clstid)
+            clst = CLST.MoraxCluster(clstid)
             self.ClusterList.append(copy.deepcopy(clst))
         self.MoraxTimeFilm = TF.TimeFilm()
         print["[Morax][Hardware] chip initialized."]

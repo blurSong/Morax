@@ -69,7 +69,7 @@ class RRAMSlice:
     def __init__(
         self,
         _sliceid,
-        _layerids: tuple(int, int) = (0, 0),
+        _layerids: tuple = (0, 0),
         _islut=True,
         _mvmrow=MoraxConfig.RRAMXbarSize - MoraxConfig.RRAMLUTRows,
         _mvmcol=MoraxConfig.RRAMXbarSize,
@@ -91,7 +91,7 @@ class RRAMSlice:
 
     # info: (modelname, layerid, mappingmap(rowid, colid))
     def map_slice(
-        self, _layerinfo: tuple(str, int, (int, int)), _mvmrow, _mvmcol, _lutrow,
+        self, _layerinfo: tuple, _mvmrow, _mvmcol, _lutrow,
     ):
         self.mapped = True
         self.layerinfo = _layerinfo

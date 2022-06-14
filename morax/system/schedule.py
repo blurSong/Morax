@@ -1,1 +1,2 @@
-def schedule_query()
+def schedule_query():
+    return

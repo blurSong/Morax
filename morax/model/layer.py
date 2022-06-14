@@ -5,9 +5,6 @@
 from enum import Enum
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as Func
 
 morax_layer_csv_dicts_cnn = {
     "IC": 0,

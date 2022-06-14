@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 import subprocess as SP
 import multiprocessing as MP
-import torch
 import openpyxl
 import math
 
@@ -33,13 +32,8 @@ def set_path():
     """
     if os.path.exists(output_path):
         SP.run('rm [{}]{}_dla.csv'.format(dataflow, model), cwd=output_path, shell=True)
-        SP.run('rm [{}]{}_rram.csv'.format(dataflow, model), cwd=output_path, shell=True)
-        SP.run('rm {}_dla_{}.csv'.format(model, dataflow), cwd=output_path, shell=True)
-        SP.run('rm {}_rram_noc*.csv'.format(model), cwd=output_path, shell=True)
     if os.path.exists(model_path):
         SP.run('rm ' + model + '.csv', cwd=model_path, shell=True)
-        SP.run('rm ' + model + '_dla_' + dataflow + '.m', cwd=model_path, shell=True)
-        SP.run('rm ' + model + '_dla_model.m', cwd=model_path, shell=True)
     """
     sys.path.append(home_path)
     sys.path.append(data_path)
@@ -88,7 +82,7 @@ def set_parser():
         ],
     )
     parser.add_argument("--store_trace", action="store_true", default=False)
-    parser.add_argument("--use_normal_model", action="store_true", default=True)
+    parser.add_argument("--use_non_normal_model", action="store_false", default=True)
     return parser
 
 
@@ -111,7 +105,7 @@ if __name__ == "__main__":
     model_path = os.path.abspath(os.path.join(data_path, "model"))
     result_path = os.path.abspath(os.path.join(data_path, "result_path"))
     model_type = get_modeltype(args.model)
-    if not args.use_normal_model:
+    if args.use_non_normal_model:
         if model_type == model.ModelType.CNN:
             LUTEN = True
             csvparser.remove_bn_to_csv(model_path, args.model)

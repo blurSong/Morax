@@ -3,7 +3,6 @@
 # Author: Tao Song.
 # Last modification: 0327
 
-from types import NoneType
 import numpy as np
 import subprocess as SP
 import multiprocessing as MP

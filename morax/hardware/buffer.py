@@ -12,8 +12,10 @@ from morax.system.interface import BO, ClusterComponent
 from morax.system.timefilm import TimeFilm, TimeStamp
 from collections import UserDict
 from morax.system.config import MoraxConfig, HWParam
-from morax.system.query import QueryBuffer
-from morax.system.memonitor import Scratchpad
+
+# from morax.system.query import QueryBuffer
+from morax.system.scratchpad import Scratchpad
+
 
 """
 # [bulk]
@@ -126,7 +128,7 @@ class ScratchpadBuffer:
     def merge_buffer(self, _note, _layerdict):
         self.Scratchpad.merge_scratchpad(_note, _layerdict)
 
-    def run_query(self, _q_buffer: QueryBuffer, _issue_t) -> int:
+    def run_query(self, _q_buffer, _issue_t) -> int:
         execution = _q_buffer.execution
         assert execution in [BO.Read, BO.Write]
         timestamplabel = "read_" if execution == BO.Read else "write_"

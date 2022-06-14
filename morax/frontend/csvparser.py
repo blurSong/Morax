@@ -12,7 +12,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import subprocess as SP
-from torch._C import CONV_BN_FUSION
+
+# from torch._C import CONV_BN_FUSION
 from morax.model.layer import morax_linearlayer_type_dicts as MXLTD
 
 

@@ -12,11 +12,11 @@ from morax.system.interface import BO, CC
 from morax.system.timefilm import TimeFilm, TimeStamp
 from morax.system.config import MoraxConfig, HWParam
 import morax.system.query as Q
-import buffer
-import nvtensorcore
-import tensorcore
-import smu
-import vpu
+import morax.hardware.buffer as buffer
+import morax.hardware.nvtensorcore as nvtensorcore
+import morax.hardware.tensorcore as tensorcore
+import morax.hardware.smu as smu
+import morax.hardware.vpu as vpu
 
 
 class MoraxCluster:

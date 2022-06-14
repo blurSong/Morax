@@ -5,7 +5,6 @@
 
 
 from ast import Assign
-from dbm import _Database
 from sqlite3 import DataError
 import queue
 import sys
@@ -24,8 +23,6 @@ from morax.model.layer import (
 )
 from morax.system.config import MoraxConfig, HWParam
 from morax.hardware.buffer import DataBulk
-from morax.hardware.chip import MoraxChip
-import mapper
 import math
 from morax.model.model import ModelDAG, ModelList, ModelType
 from morax.frontend.api import (
@@ -105,7 +102,8 @@ class QueryExcuteOnTC(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksizelist: list(tuple(int, int)),
+        _tasksizelist: list,
+        # list of tuple (row, col)
         _bulksize,  # add 03.28
     ):
         super().__init__(_layerclass, _tasklabel)
@@ -160,7 +158,7 @@ class QueryExcuteOnVPU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(int, int) = (0, 0),
+        _tasksize: tuple = (0, 0),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
@@ -182,7 +180,7 @@ class QueryExcuteOnSMU(QueryExcute):
         _tasklabel: str,
         _dfmod: str,
         _execution,
-        _tasksize: tuple(int, int) = (0, 0),
+        _tasksize: tuple = (0, 0),
     ):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
@@ -274,7 +272,7 @@ class LayerQuery:
         assert self.FINISHED_FLAG
         return self.SUBMIT_TIME
 
-    def compile(self, _modelname, _moraxchip: MoraxChip, _concatlist=[]):
+    def compile(self, _modelname, _moraxchip, _concatlist=[]):
         # Generate subqueries of this layer query
         print("[Morax][System] Compiling Query {}.".format(self.q_index))
         layertype = self.layerclass.layer_type
@@ -321,7 +319,7 @@ class LayerQuery:
 
 
 def generate_queries(
-    _modelDAG: ModelDAG, _moraxchip: MoraxChip, _batch=1,
+    _modelDAG: ModelDAG, _moraxchip, _batch=1,
 ):
     totalquery = 0
     for idx in _modelDAG.LayerIndexList:
@@ -388,7 +386,7 @@ def compileCONCAT(_index, _layerclass, _concatlist):
 
 
 def compileRRAM(
-    _index, _modelname, _layerclass, _doclotnsl: dict, _chip: MoraxChip, _batch, token
+    _index, _modelname, _layerclass, _doclotnsl: dict, _chip, _batch, token
 ):
     # NOTE BATCH IS ALWAYS THE LAST
     # dict of clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]
