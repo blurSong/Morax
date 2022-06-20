@@ -1,5 +1,18 @@
 import math
 import morax.model.layer as LYR
+from morax.model.model import ModelDAG
+from enum import Enum
+
+'''
+greedy 需要先验地得到每一层的执行时间
+dp 
+'''
+
+class Strategy(Enum):
+    fifo = 0
+    random = 1
+    greedy = 2
+    dp = 3
 
 
 def calc_xbars(
@@ -39,7 +52,42 @@ def calc_xbars(
         return xbars
 
 
-def schedule_rram_layers(_modelDAG, xbar_num, xbar_size: tuple, bars_per_word):
-    # _rram_rramcap: data capacity of all rrams
+def schedule_rram_layers(
+    _modelDAG: ModelDAG,
+    _xbar_num,
+    _xbar_size: tuple,
+    _bars_per_word,
+    _strategy: Strategy,
+):
+    # basic mapping unit: slice
+    total_slice_num = _xbar_num / _bars_per_word
+    if _strategy == Strategy.greedy:
+        OnRRAMLayerIndexList = offline_greedy(
+            _modelDAG, total_slice_num, _xbar_size, _bars_per_word
+        )
+    elif _strategy == Strategy.dp:
+        OnRRAMLayerIndexList = offline_dp(
+            _modelDAG, total_slice_num, _xbar_size, _bars_per_word
+        )
+    return OnRRAMLayerIndexList
+
+
+def offline_greedy(_modelDAG: ModelDAG, _slice, _xbar_size: tuple, _bpw):
     OnRRAMLayerIndexList = []
     return OnRRAMLayerIndexList
+
+
+def offline_dp(_modelDAG: ModelDAG, _slice, _xbar_size: tuple, _bpw):
+    OnRRAMLayerIndexList = []
+    candidate_layer_list = [-1]
+    # init
+    for lyr in _modelDAG.LayerIndexList:
+        _modelDAG.LayerAssignmentDict = [] # C 
+
+    while candidate_layer_list:
+        for idx in candidate_layer_list:
+
+    return OnRRAMLayerIndexList
+
+def dp():
+    return

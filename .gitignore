@@ -5,6 +5,6 @@ morax/frontend/__pycache__/
 morax/hardware/__pycache__/
 morax/model/__pycache__/
 morax/system/__pycache__/
-morax/algorithm/__pycache__/
+algorithm/__pycache__/
 
 

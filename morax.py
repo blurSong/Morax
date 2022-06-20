@@ -106,15 +106,15 @@ if __name__ == "__main__":
     result_path = os.path.abspath(os.path.join(data_path, "result_path"))
     model_type = get_modeltype(args.model)
     if model_type == model.ModelType.CNN:
-        LUT_EN_ = True
+        LUTEN_ = True
         if args.use_non_normal_model:
             csvparser.remove_bn_to_csv(model_path, args.model)
     elif model_type == model.ModelType.MLP:
-        LUT_EN_ = False
+        LUTEN_ = False
         if args.use_non_normal_model:
             csvparser.remove_bn_to_csv(model_path, args.model)
     elif model_type == model.ModelType.MHATTENTION:
-        LUT_EN_ = True
+        LUTEN_ = True
         if args.use_non_normal_model:
             csvparser.remove_ln_to_csv(model_path, args.model)
     csvparser.add_pooling_to_csv(model_path, args.model, not args.use_non_normal_model)
@@ -131,12 +131,14 @@ if __name__ == "__main__":
     # init morax obj
     MoraxChip = chip.MoraxChip()
     MemMonitor = memonitor.Memonitor()
-    Mapper = mapper.Mapper(LUT_EN_)
+    Mapper = mapper.Mapper(LUTEN_)
 
-    # offline process and run
+    # run
     if args.scenario == "sm":
+        # offline process
         Mapper.map_single(ModelDAG, MoraxChip)
         query.generate_queries(ModelDAG, MoraxChip, args.batch)
+        # online process
         MoraxChip.invoke_morax(ModelDAG, MemMonitor)
     elif args.scenario == "mm":
         # TODO

@@ -16,9 +16,9 @@ class Mapper:
         self.lut_row = CFG.MoraxConfig.RRAMLUTRows if _LUTEN else 0
         self.xbar_num = (
             CFG.MoraxConfig.ClusterNum
-            * CFG.MoraxConfig.NVTCNum
-            * CFG.MoraxConfig.RRAMSliceNum
-            * CFG.MoraxConfig.RRAMXbarNum
+            * CFG.MoraxConfig.NVTCNum  # tile
+            * CFG.MoraxConfig.RRAMSliceNum  # pe
+            * CFG.MoraxConfig.RRAMXbarNum  # 8 xbar
         )
         self.rram_cap_byte = (
             self.xbar_num
@@ -87,12 +87,14 @@ class Mapper:
     def map_multi(self, _modelDAG: MD.ModelDAG, _moraxChip: CP.MoraxChip):
         return
 
-    def map_single(self, _modelDAG: MD.ModelDAG, _moraxChip: CP.MoraxChip):
+    def map_single(
+        self, _modelDAG: MD.ModelDAG, _moraxChip: CP.MoraxChip, _strategy: OFL.Strategy
+    ):
         # _doclotnsl
         # dict of clstid: [(nvtcid, sliceidlist), tuple2, ... ]
         with assuming(self.bars_per_word == CFG.MoraxConfig.RRAMXbarNum):
             OnRRAMLayerIndexList = OFL.schedule_rram_layers(
-                _modelDAG, self.xbar_num, self.xbar_size, self.bars_per_word
+                _modelDAG, self.xbar_num, self.xbar_size, self.bars_per_word, _strategy
             )
             for orli in OnRRAMLayerIndexList:
                 xbar_num, row_l, col_l = OFL.calc_xbars(

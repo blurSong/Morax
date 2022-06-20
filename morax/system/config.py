@@ -14,7 +14,7 @@ class MoraxConfig:
     # [TensorCore]
     PEArrayNum = 8
     PEArrayBufferSizeKB = 64
-    PEArraySize = 32
+    PEArraySize = 16
     NOCBandwidthGbps = 1024
 
     # [nvTensorCore]
