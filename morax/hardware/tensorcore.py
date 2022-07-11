@@ -250,6 +250,37 @@ class TensorCore:
         self.TimeFilm.append_stamp(timestamp)
         return self.TimeFilm[-1].submit_t
 
+    def run_demmy_query(self, _qclass_tc: QueryExcuteOnTC) -> int:
+        query_tc = copy.deepcopy(_qclass_tc)
+        sq_pearraylist = []
+        receive_t_list = []
+        sq_pearray = {}
+        assert len(query_tc.tasksizelist) == self.pearraynum
+        for peid in range(self.pearraynum):
+            sq_pearray["subtasksize"] = query_tc.tasksizelist[peid]
+            sq_pearray["dfmod"] = query_tc.dfmod
+            sq_pearray["execution"] = query_tc.execution
+            sq_pearray["subtasklabel"] = (
+                query_tc.tasklabel + "_tc" + str(self.tcid) + "_pe" + str(peid)
+            )
+            sq_pearraylist.append(copy.deepcopy(sq_pearray))
+        # 2. justify invoke time
+        q_noc = {"tasklabel": query_tc.tasklabel, "tasksizelist": query_tc.tasksizelist}
+        invoke_t = self.NOC.run_query(q_noc, 0, query_tc.bulksize)
+        # 3. on-fly
+        for peid in range(self.pearraynum):
+            if (
+                sq_pearraylist[peid]["subtasksize"][0] > 0
+                and sq_pearraylist[peid]["subtasksize"][1] > 0
+            ):
+                receive_t_list[peid] = self.PEArrayObjList[peid].run_subquery(
+                    sq_pearraylist[peid], invoke_t, query_tc.layerclass
+                )
+            else:
+                receive_t_list[peid] = invoke_t
+        submit_t = max(receive_t_list)
+        return submit_t
+
 
 def is_zero(size):
     return size > -0.0000000009 and size < 0.0000000009

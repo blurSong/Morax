@@ -243,7 +243,7 @@ class Scratchpad:
                 k1 = _bulk.bulkscratch["K"][1]
                 c0 = _bulk.bulkscratch["C"][0]
                 c1 = _bulk.bulkscratch["C"][1]
-                [c00, c11, k00, k11] = [-1] * 4
+                [c00, c11, k00, k11] = [-1, -1, -1, -1]
                 subbulksize = 0
                 for kctup in kclist:
                     if kctup[0][0] > k1:

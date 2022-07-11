@@ -96,10 +96,11 @@ class BufferIOActionDict:
 
 
 class ScratchpadBuffer:
-    def __init__(self, _sizeKB, _bandwidthgbps=0) -> None:
+    def __init__(self, _sizeKB, _rbandwidthgbps=0, _wbandwidthgbps=0) -> None:
         self.CapacityByte = _sizeKB * 1024
         self.WaterLineByte = 0
-        self.BandwidthGbps = _bandwidthgbps
+        self.ReadBandwidthGbps = _rbandwidthgbps
+        self.WriteBandwidthGbps = _wbandwidthgbps
         self.Scratchpad = Scratchpad()
         self.TimeFilm = TimeFilm()
         self.BufferIOList = []
@@ -132,6 +133,7 @@ class ScratchpadBuffer:
         execution = _q_buffer.execution
         assert execution in [BO.Read, BO.Write]
         timestamplabel = "read_" if execution == BO.Read else "write_"
+        bw = self.ReadBandwidthGbps if execution == BO.Read else self.WriteBandwidthGbps
         biots = TimeStamp(
             _q_buffer.execution,
             _issue_t,
@@ -149,11 +151,7 @@ class ScratchpadBuffer:
                 else:
                     return -1
                     # need inter cluster read or dram read
-        runtime = (
-            _q_buffer.databulkclass.sizebyte * 8 / self.BandwidthGbps
-            if self.BandwidthGbps != 0
-            else 0
-        )
+        runtime = _q_buffer.databulkclass.sizebyte * 8 / bw if bw != 0 else 0
         biots.update_span(runtime)
         self.TimeFilm.append_stamp_bufferver(biots)
         self.BufferIOList.append(bioatd)

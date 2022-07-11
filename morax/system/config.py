@@ -7,7 +7,8 @@ class MoraxConfig:
     # [Cluster]
     WeightBufferSizeKB = 1024
     FeatureBufferSizeKB = 256
-    FeatureBufferBandwidthGbps = 1024
+    BufferReadBandwidthGbps = 1024
+    BufferWriteBandwidthGbps = 786
     TCNum = 8
     NVTCNum = 32
 

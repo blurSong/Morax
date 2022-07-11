@@ -53,6 +53,7 @@ class MoraxChip:
 
             # 0.2 update candidate list
             CandidateLayerList.remove(thisrun_index)
+            _modelDAG.LayerQueryClassDict[thisrun_index].FINISHED_FLAG = True
             for candiidx in _modelDAG.toVertexDict[thisrun_index]:
                 iscandidate = True
                 for tmpfromidx in _modelDAG.fromVertexDict[candiidx]:

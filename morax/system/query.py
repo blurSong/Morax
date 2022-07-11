@@ -318,6 +318,26 @@ class LayerQuery:
         return
 
 
+def generate_demmy_queries(
+    _modelDAG: ModelDAG, _batch=1,
+):
+    chip = 0
+    totalquery = 0
+    for idx in _modelDAG.LayerIndexList:
+        q = LayerQuery(
+            idx,
+            _batch,
+            _modelDAG.LayerClassDict[idx],
+            {},
+            len(_modelDAG.fromVertexDict[idx]),
+            len(_modelDAG.toVertexDict[idx]),
+        )  # TODO: CHANGE INDEX TUPLE of Layerclass
+        q.compile(_modelDAG.modelname, chip, _modelDAG.ConcatList)
+        _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
+        totalquery += 1
+    assert totalquery == _modelDAG.layernum
+
+
 def generate_queries(
     _modelDAG: ModelDAG, _moraxchip, _batch=1,
 ):

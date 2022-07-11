@@ -110,6 +110,7 @@ class LinearLayer(Layer):
         Layer.__init__(self, _layername, _layerindex)
         self.layer_type = _layertype
         self.layer_csvline = _layercsvline
+        self.memsizebyte = -1
 
 
 """CONV based Models"""

@@ -132,6 +132,7 @@ if __name__ == "__main__":
     MoraxChip = chip.MoraxChip()
     MemMonitor = memonitor.Memonitor()
     Mapper = mapper.Mapper(LUTEN_)
+    # Schdule = offline.Schdule
 
     # run
     if args.scenario == "sm":

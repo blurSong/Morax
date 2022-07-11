@@ -69,7 +69,7 @@ class ModelDAG:
         _layerindex,
         _onRRAM=False,
         _doclotnsl: dict = {},
-        # dict of clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]
+        # dict of {clstid: [tuple1(nvtcid, sliceidlist), tuple2, ... ]}
     ):
         # NOTE assume one cluster is engouh for one layer now
         if _onRRAM:

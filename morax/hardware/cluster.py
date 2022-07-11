@@ -24,7 +24,9 @@ class MoraxCluster:
         self.clusterid = _clusterid
         self.WeightBuffer = buffer.ScratchpadBuffer(MoraxConfig.WeightBufferSizeKB, 0)
         self.FeatureBuffer = buffer.ScratchpadBuffer(
-            MoraxConfig.FeatureBufferSizeKB, MoraxConfig.FeatureBufferBandwidthGbps
+            MoraxConfig.FeatureBufferSizeKB,
+            MoraxConfig.BufferReadBandwidthGbps,
+            MoraxConfig.BufferWriteBandwidthGbps,
         )
         self.VPU = vpu.VPU()
         self.SMU = smu.SMU()
