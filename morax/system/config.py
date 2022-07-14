@@ -10,7 +10,7 @@ class MoraxConfig:
     BufferReadBandwidthGbps = 1024
     BufferWriteBandwidthGbps = 786
     TCNum = 8
-    NVTCNum = 32
+    NVTCNum = 144
 
     # [TensorCore]
     PEArrayNum = 8

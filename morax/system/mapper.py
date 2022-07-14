@@ -88,13 +88,22 @@ class Mapper:
         return
 
     def map_single(
-        self, _modelDAG: MD.ModelDAG, _moraxChip: CP.MoraxChip, _strategy: OFL.Strategy
+        self,
+        _modelDAG: MD.ModelDAG,
+        _moraxChip: CP.MoraxChip,
+        _strategy: OFL.Strategy,
+        _batch,
     ):
         # _doclotnsl
         # dict of clstid: [(nvtcid, sliceidlist), tuple2, ... ]
         with assuming(self.bars_per_word == CFG.MoraxConfig.RRAMXbarNum):
-            OnRRAMLayerIndexList = OFL.schedule_rram_layers(
-                _modelDAG, self.xbar_num, self.xbar_size, self.bars_per_word, _strategy
+            CschduleList, OnRRAMLayerIndexList = OFL.schedule_layers(
+                _modelDAG,
+                self.xbar_num,
+                self.xbar_size,
+                self.bars_per_word,
+                _strategy,
+                _batch,
             )
             for orli in OnRRAMLayerIndexList:
                 xbar_num, row_l, col_l = OFL.calc_xbars(
@@ -126,4 +135,4 @@ class Mapper:
                     and self.mapper_breakpoint[2] == sliceid
                 )
                 _modelDAG.assign_layer(orli, True, doclotnsl)
-        return
+        return CschduleList, OnRRAMLayerIndexList

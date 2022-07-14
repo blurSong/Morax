@@ -413,12 +413,16 @@ def compileRRAM(
     SubQueryList = []
     layertype = _layerclass.layer_type
     (IIleft, IIright) = _layerclass.input_indecies_tuple
+    xbar_size = [
+        MoraxConfig.RRAMXbarSize - MoraxConfig.RRAMLUTRows,
+        MoraxConfig.RRAMXbarSize,
+    ]
     if layertype == LLT.Linear or layertype == LLT.VMM:
         # (CLSTNVTC B) V WB
-        M = math.ceil(_layerclass.row_dim * 1.0 / MoraxConfig.RRAMXbarSize)
-        N = math.ceil(_layerclass.col_dim * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = _layerclass.row_dim % MoraxConfig.RRAMXbarSize
-        N_tail = _layerclass.col_dim % MoraxConfig.RRAMXbarSize
+        M = math.ceil(_layerclass.row_dim * 1.0 / xbar_size[0])
+        N = math.ceil(_layerclass.col_dim * 1.0 / xbar_size[1])
+        M_tail = _layerclass.row_dim % xbar_size[0]
+        N_tail = _layerclass.col_dim % xbar_size[1]
         taskindex = -1
         for bat in range(_batch):
             for clstid, nvtclist in _doclotnsl.items():
@@ -457,16 +461,16 @@ def compileRRAM(
                         if inf == M and M_tail > 0:
                             bsize += M_tail
                         else:
-                            bsize += MoraxConfig.RRAMXbarSize
+                            bsize += xbar_size[0]
                         fst = inf if inf < fst else fst
                         lst = inf if lst < inf else lst
                     last = (
-                        (lst + 1) * MoraxConfig.RRAMXbarSize - 1
+                        (lst + 1) * xbar_size[0] - 1
                         if lst != M
                         else _layerclass.row_dim
                     )
                     bulkscratch[rowpart] = (
-                        fst * MoraxConfig.RRAMXbarSize,
+                        fst * xbar_size[0],
                         last,
                     )
                     bsize = bsize * MoraxConfig.PrecisionBits / 8
@@ -515,18 +519,11 @@ def compileRRAM(
 
     if layertype == LLT.CONV:
         M = math.ceil(
-            _layerclass.in_channel
-            * _layerclass.kernel_size ** 2
-            * 1.0
-            / MoraxConfig.RRAMXbarSize
+            _layerclass.in_channel * _layerclass.kernel_size ** 2 * 1.0 / xbar_size[0]
         )
-        N = math.ceil(_layerclass.out_channel * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = (
-            _layerclass.in_channel
-            * _layerclass.kernel_size ** 2
-            % MoraxConfig.RRAMXbarSize
-        )
-        N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
+        N = math.ceil(_layerclass.out_channel * 1.0 / xbar_size[1])
+        M_tail = _layerclass.in_channel * _layerclass.kernel_size ** 2 % xbar_size[0]
+        N_tail = _layerclass.out_channel % xbar_size[1]
         omapsize = _layerclass.feature_size / _layerclass.stride
         rram_taskindex = -1
         vpu_taskindex = -1
@@ -564,9 +561,7 @@ def compileRRAM(
                         / 8
                     )
                     bsize *= (
-                        _layerclass.kernel_size - 1
-                        if col_iter == 0
-                        else _layerclass.stride
+                        _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
                     )
                     bulk = DataBulk(
                         _modelname, _index + IIleft, datatype, bsize, bulkscratch
@@ -633,18 +628,11 @@ def compileRRAM(
 
     if layertype == LLT.TRCONV:
         M = math.ceil(
-            _layerclass.in_channel
-            * _layerclass.kernel_size ** 2
-            * 1.0
-            / MoraxConfig.RRAMXbarSize
+            _layerclass.in_channel * _layerclass.kernel_size ** 2 * 1.0 / xbar_size[0]
         )
-        N = math.ceil(_layerclass.out_channel * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = (
-            _layerclass.in_channel
-            * _layerclass.kernel_size ** 2
-            % MoraxConfig.RRAMXbarSize
-        )
-        N_tail = _layerclass.out_channel % MoraxConfig.RRAMXbarSize
+        N = math.ceil(_layerclass.out_channel * 1.0 / xbar_size[1])
+        M_tail = _layerclass.in_channel * _layerclass.kernel_size ** 2 % xbar_size[0]
+        N_tail = _layerclass.out_channel % xbar_size[1]
         omapsize = (
             _layerclass.feature_size - 1
         ) * _layerclass.stride + _layerclass.kernel_size
@@ -738,21 +726,17 @@ def compileRRAM(
             (_layerclass.in_channel / _layerclass.group)
             * _layerclass.kernel_size ** 2
             * 1.0
-            / MoraxConfig.RRAMXbarSize
+            / xbar_size[0]
         )
         N = math.ceil(
-            (_layerclass.out_channel / _layerclass.group)
-            * 1.0
-            / MoraxConfig.RRAMXbarSize
+            (_layerclass.out_channel / _layerclass.group) * 1.0 / xbar_size[1]
         )
         M_tail = (
             (_layerclass.in_channel / _layerclass.group)
             * _layerclass.kernel_size ** 2
-            / MoraxConfig.RRAMXbarSize
+            / xbar_size[0]
         )
-        N_tail = (
-            _layerclass.out_channel / _layerclass.group
-        ) / MoraxConfig.RRAMXbarSize
+        N_tail = (_layerclass.out_channel / _layerclass.group) / xbar_size[1]
         rram_taskindex = -1
         vpu_taskindex = -1
         group_inchannel = _layerclass.in_channel / _layerclass.group
@@ -891,10 +875,10 @@ def compileRRAM(
             m_dim = _layerclass.m_dim
             k_dim = _layerclass.k_dim
             n_dim = _layerclass.n_dim
-        M = math.ceil(k_dim * 1.0 / MoraxConfig.RRAMXbarSize)
-        N = math.ceil(n_dim * 1.0 / MoraxConfig.RRAMXbarSize)
-        M_tail = k_dim % MoraxConfig.RRAMXbarSize
-        N_tail = n_dim % MoraxConfig.RRAMXbarSize
+        M = math.ceil(k_dim * 1.0 / xbar_size[0])
+        N = math.ceil(n_dim * 1.0 / xbar_size[1])
+        M_tail = k_dim % xbar_size[0]
+        N_tail = n_dim % xbar_size[1]
         # assume fetch batch is 16 = NVTCNUM/2
         vfetch = 16
         V = math.ceil(m_dim * 1.0 / vfetch)
@@ -930,16 +914,12 @@ def compileRRAM(
                             if inf == M and M_tail > 0:
                                 bsize += M_tail
                             else:
-                                bsize += MoraxConfig.RRAMXbarSize
+                                bsize += xbar_size[0]
                             fst = inf if inf < fst else fst
                             lst = inf if lst < inf else lst
-                        last = (
-                            (lst + 1) * MoraxConfig.RRAMXbarSize - 1
-                            if lst != M
-                            else k_dim
-                        )
+                        last = (lst + 1) * xbar_size[0] - 1 if lst != M else k_dim
                         bulkscratch["N"] = (
-                            fst * MoraxConfig.RRAMXbarSize,
+                            fst * xbar_size[0],
                             last,
                         )
                         bsize = vfetch * bsize * MoraxConfig.PrecisionBits / 8

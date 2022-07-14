@@ -118,6 +118,7 @@ class RRAMSlice:
                 int(self.EightXbar["mvmcol"] / HWParam.ADCSpeedGbps)
                 * MoraxConfig.PrecisionBits
                 + MoraxConfig.RRAMXbarNum
+                + 1
             )
         # SO.LookUp
         elif _q_slice["execution"] == nvTCExe[6]:
@@ -213,7 +214,7 @@ class nvTensorCore:
                     q_slice_list.pop(0), issue_t
                 )
             )
-        submit_t = max(receive_t_list)
+        submit_t = max(receive_t_list) + self.Tree.uptream()
         timestamp.update_submit_t(submit_t)
         self.TimeFilm.append_stamp(timestamp)
         return self.TimeFilm[-1].submit_t

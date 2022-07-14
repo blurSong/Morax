@@ -1,5 +1,6 @@
 from calendar import c
 import math
+from random import gauss
 from tkinter.tix import Select
 from xml.dom.minidom import Element
 from anyio import current_time
@@ -13,7 +14,7 @@ import morax.model.layer as LYR
 from morax.model.model import ModelDAG
 import morax.system.query as QR
 import morax.system.interface as IF
-from morax.system.config import MoraxConfig
+from morax.system.config import MoraxConfig, HWParam
 from morax.hardware.chip import spcify_querybulk
 from morax.hardware.tensorcore import TensorCore
 from morax.hardware.vpu import VPU
@@ -201,7 +202,63 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
         )
 
 
-def schedule_rram_layers(
+def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _batch):
+    """called after scheduled"""
+    layertype = _layerclass.layer_type
+    if layertype in [
+        LYR.LinearLayerType.CONV,
+        LYR.LinearLayerType.TRCONV,
+        LYR.LinearLayerType.NGCONV,
+    ]:
+        B = _batch
+        O1 = (
+            (_layerclass.feature_size - 1) * _layerclass.stride
+            + _layerclass.kernel_size
+            if layertype == LYR.LinearLayerType.TRCONV
+            else _layerclass.feature_size / _layerclass.stride
+        )
+        O2 = O1
+        G = _layerclass.group if layertype == LYR.LinearLayerType.NGCONV else 1
+        R = math.ceil(_row_l * 1.0 / _xbar_size[0])
+        rbulksizebits = (
+            _layerclass.kernel_size ** 2
+            * _layerclass.in_channel
+            * MoraxConfig.PrecisionBits
+            / G
+        )
+    else:
+        B = _batch
+        O1 = (
+            1
+            if layertype in [LYR.LinearLayerType.Linear, LYR.LinearLayerType.VMM]
+            else (
+                _layerclass.m_dim
+                if _layerclass.input_indecies_tuple[1] == 0
+                else _layerclass.n_dim
+            )
+        )
+        O2 = 1
+        rbulksizebits = _row_l * MoraxConfig.PrecisionBits
+
+    # for bat in range(B):
+    #     for grp in range(G):
+    fb_runtime = rbulksizebits / MoraxConfig.BufferReadBandwidthGbps
+    rram_runtime = (
+        (_xbar_size[1] * 1.0 / HWParam.ADCSpeedGbps) * MoraxConfig.PrecisionBits
+        + MoraxConfig.RRAMXbarNum
+        + 1  # da
+        + 2  # hops
+    )
+    vpu_time = R * math.ceil(
+        float(_col_l) / (MoraxConfig.LaneSize * MoraxConfig.LaneNum)
+    )
+    rb_time = _col_l * MoraxConfig.PrecisionBits / MoraxConfig.BufferWriteBandwidthGbps
+    runtime = fb_runtime + rram_runtime * O1 * O2 + vpu_time + rb_time
+    runtime = runtime * B
+    return runtime
+
+
+def schedule_layers(
     _modelDAG: ModelDAG,
     _xbar_num,
     _xbar_size: tuple,
@@ -218,7 +275,7 @@ def schedule_rram_layers(
     for lyridx in schduleDAG.LayerIndexList:
         # if schduleDAG.LayerClassDict.layer_type >= 0:
         if isinstance(schduleDAG.LayerClassDict[lyridx], LYR.LinearLayer):
-            schduleDAG.LayerOnCMOSMTDict[lyridx] = calc_mem_time(
+            schduleDAG.LayerOnCMOSDict_MT[lyridx] = calc_mem_time(
                 schduleDAG.LayerClassDict[lyridx], bytes_per_word
             )
         else:
@@ -229,15 +286,17 @@ def schedule_rram_layers(
         )
     # choose strategy and get cmos sch
     if _strategy == Strategy.greedy:
-        CMOSSchduleList = offline_greedy(schduleDAG)
+        CschduleList = offline_sch_greedy(schduleDAG)
     elif _strategy == Strategy.layerwaver:
-        CMOSSchduleList = offline_layerwaver(schduleDAG)
-    # make rram mapping sch
-    # todo
-    return
+        CschduleList = offline_sch_layerwaver(schduleDAG)
+    # make rram mapping
+    OnRRAMLayerIndexList = offline_map_naive(
+        schduleDAG, CschduleList, _xbar_num, _xbar_size, _bars_per_word, _batch
+    )
+    return CschduleList, OnRRAMLayerIndexList
 
 
-def offline_greedy(schduleDAG: SchduleDAG, _bpw):
+def offline_sch_greedy(schduleDAG: SchduleDAG):
     SchduleList = [-1]
     CandidateLayerList = copy.deepcopy(schduleDAG.toVertexDict[-1])
     while CandidateLayerList:
@@ -274,8 +333,44 @@ def offline_greedy(schduleDAG: SchduleDAG, _bpw):
     return SchduleList
 
 
-def offline_layerwaver(schduleDAG: SchduleDAG, _bpw):
+def offline_sch_layerwaver(schduleDAG: SchduleDAG):
     return
+
+
+def offline_map_naive(
+    schduleDAG: SchduleDAG,
+    CschduleIndexList,
+    _xbar_num,
+    _xbar_size,
+    _bars_per_word,
+    _batch,
+):
+    total_bars = _xbar_num
+    OnRRAMLayerIndexList = []
+    GainDict = {}
+    BarDict = {}
+    for sched_lyridx in CschduleIndexList:
+        lyrclass = schduleDAG.LayerClassDict[sched_lyridx]
+        bars, rol, col = calc_xbars(lyrclass, _xbar_size, _bars_per_word, True)
+        ctime = (
+            schduleDAG.LayerOnCMOSDict_CT[sched_lyridx]
+            + schduleDAG.LayerOnCMOSDict_MT[sched_lyridx]
+        )
+        rtime = calc_rram_time(lyrclass, rol, col, _xbar_size, _batch)
+        gain = (ctime - rtime) * 1.0 / bars
+        GainDict[sched_lyridx] = gain
+        BarDict[sched_lyridx] = bars
+    gain_sorted_lot = sorted(
+        GainDict.items(), key=lambda x: x[1], reverse=True
+    )  # [(idx, gain)]
+    for gtup in gain_sorted_lot:
+        bars = BarDict[gtup[0]]
+        if bars <= total_bars:
+            OnRRAMLayerIndexList.append(gtup[0])
+            total_bars = total_bars - bars
+        else:
+            continue
+    return OnRRAMLayerIndexList
 
 
 """
