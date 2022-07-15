@@ -22,6 +22,8 @@ from morax.model import model
 from morax.hardware import chip
 from morax.system import memonitor, query, mapper
 
+import algorithm.online as OL
+
 
 def set_path():
     global home_path, morax_path, algorithm_path, data_path
@@ -47,6 +49,7 @@ def set_parser():
     parser.add_argument(
         "--scenario", type=str, default="sm", choices=["sm", "mm", "cs"]
     )  # single model multi-model context-switching
+    parser.add_argument("--strategy", type=int, default="2", choices=[0, 1, 2, 3, 4])
     parser.add_argument(
         "--model",
         type=str,
@@ -83,6 +86,7 @@ def set_parser():
     )
     parser.add_argument("--store_trace", action="store_true", default=False)
     parser.add_argument("--use_non_normal_model", action="store_true", default=False)
+
     return parser
 
 
@@ -132,15 +136,17 @@ if __name__ == "__main__":
     MoraxChip = chip.MoraxChip()
     MemMonitor = memonitor.Memonitor()
     Mapper = mapper.Mapper(LUTEN_)
-    # Schdule = offline.Schdule
+    Schduler = OL.Schduler()
 
     # run
     if args.scenario == "sm":
         # offline process
-        Mapper.map_single(ModelDAG, MoraxChip)
+        Schduler.update_sch(
+            Mapper.map_single(ModelDAG, MoraxChip, args.strategy, args.batch)
+        )
         query.generate_queries(ModelDAG, MoraxChip, args.batch)
         # online process
-        MoraxChip.invoke_morax(ModelDAG, MemMonitor)
+        MoraxChip.invoke_morax(ModelDAG, MemMonitor, Schduler)
     elif args.scenario == "mm":
         # TODO
         Mapper.map_multi(ModelDAG, MoraxChip)

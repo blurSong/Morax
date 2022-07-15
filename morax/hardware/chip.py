@@ -40,14 +40,16 @@ class MoraxChip:
         self.MoraxTimeFilm = TF.TimeFilm()
         print("[Morax][Hardware] chip initialized.")
 
-    def invoke_morax(self, _modelDAG: ModelDAG, _monitor: MM.Memonitor):
+    def invoke_morax(
+        self, _modelDAG: ModelDAG, _monitor: MM.Memonitor, Schduler: OL.Schduler
+    ):
         # RRAM:
         # CMOS:
         CandidateLayerList = [-1]
         while True:
             # 0.1 choose one layer, report layer index and issue_time
             # TODO OL.schedule_one_layer
-            thisrun_index, LAYER_ISSUE_TIME = OL.schedule_one_layer(
+            thisrun_index, LAYER_ISSUE_TIME = Schduler.schedule_one_layer(
                 CandidateLayerList, _modelDAG, self.ClusterList
             )
 

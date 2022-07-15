@@ -50,6 +50,8 @@ class ModelDAG:
 
         self.assigned = False
         self.compiled = False
+        self.IssueTimeDict = {}
+        self.SubmitTimeDict = {}
 
     def add_layer(self, _layerindex: int, _islinear):
         self.layernum += 1
@@ -83,6 +85,12 @@ class ModelDAG:
         # self.add_layer(-1, False)
         self.toVertexDict[-1] = []
         self.fromVertexDict[-1] = []
+
+    def update_issue_t(self, _vec, _issue_t):
+        self.IssueTimeDict[_vec] = _issue_t
+
+    def update_submit_t(self, _vec, _submit_t):
+        self.SubmitTimeDict[_vec] = _submit_t
 
 
 class ModelList(UserList):
