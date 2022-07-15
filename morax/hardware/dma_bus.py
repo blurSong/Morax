@@ -50,7 +50,7 @@ class RingBus:
             _q_bus.databulkclass, _q_bus.fromCluster, _q_bus.toCluster
         )
         busts = TimeStamp(TO.ClusterTransfer, _issue_t, _q_bus.databulkclass.label)
-        hoptime = _q_bus.subbulksizebyte * 8 / MoraxConfig.ClusterBusBandwidthGbps
+        hoptime = _q_bus.subbulksizebyte * 8 // MoraxConfig.ClusterBusBandwidthGbps
         toc = _q_bus.toCluster
         fromc = _q_bus.fromCluster
         if toc > fromc:
@@ -85,7 +85,7 @@ class DMA:
     def run_query(self, _q_dma: QueryDMA, _issue_t, _clusterlist) -> int:
         dmaad = DRAMReadActionDict(_q_dma.databulkclass, _q_dma.toCluster)
         dmats = TimeStamp(TO.ReadDRAM, _issue_t, _q_dma.databulkclass.label)
-        runtime = _q_dma.databulkclass.sizebyte * 8 / MoraxConfig.OffChipBandwidthGbps
+        runtime = _q_dma.databulkclass.sizebyte * 8 // MoraxConfig.OffChipBandwidthGbps
         # if _q_dma.worf == ClusterComponent.FeatureBuffer:
         # NOTE DO NOTHING!
         # _clusterlist[_q_dma.toCluster].FeatureBuffer.write_buffer(

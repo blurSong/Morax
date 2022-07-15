@@ -8,7 +8,7 @@ import iniconfig
 from enum import Enum
 import copy
 import numpy as np
-from morax import MoraxChip
+
 
 import morax.model.layer as LYR
 from morax.model.model import ModelDAG
@@ -30,6 +30,7 @@ class Strategy(Enum):
 
 class SchduleDAG:
     def __init__(self, _modelDAG: ModelDAG) -> None:
+        self.modelname = _modelDAG.modelname
         self.layernum = _modelDAG.layernum
         self.LayerIndexList = copy.deepcopy(_modelDAG.LayerIndexList)
         self.toVertexDict = copy.deepcopy(_modelDAG.toVertexDict)
@@ -62,9 +63,9 @@ def calc_xbars(
     elif layertype == LYR.LinearLayerType.NGCONV:
         # grpdict = _doclotnsl[grp]
         row_l = (
-            _layerclass.in_channel * (_layerclass.kernel_size ** 2) / _layerclass.group
+            _layerclass.in_channel * (_layerclass.kernel_size ** 2) // _layerclass.group
         )
-        col_l = _layerclass.out_channel / _layerclass.group
+        col_l = _layerclass.out_channel // _layerclass.group
         dup = dup * _layerclass.group
     elif layertype == LYR.LinearLayerType.GEMM:
         if _layerclass.input_indecies_tuple[0] == 0:
@@ -101,7 +102,7 @@ def calc_memsize_byte(_layerclass: LYR.LinearLayer, _bytes_per_word: int):
             _layerclass.in_channel
             * _layerclass.out_channel
             * (_layerclass.kernel_size ** 2)
-            / _layerclass.group
+            // _layerclass.group
         )
     elif layertype == LYR.LinearLayerType.DWCONV:
         params = _layerclass.channel * (_layerclass.kernel_size ** 2)
@@ -120,7 +121,7 @@ def calc_memsize_byte(_layerclass: LYR.LinearLayer, _bytes_per_word: int):
 
 def calc_mem_time(_layerclass: LYR.LinearLayer, _bytes_per_word):
     memsizebyte = calc_memsize_byte(_layerclass, _bytes_per_word)
-    return memsizebyte * 8 / MoraxConfig.OffChipBandwidthGbps
+    return memsizebyte * 8 // MoraxConfig.OffChipBandwidthGbps
 
 
 def calc_compute_time(_layerquery: QR.LayerQuery):
@@ -147,7 +148,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                         runtime = (
                             subq.databulkclass.sizebyte
                             * 8
-                            / MoraxConfig.BufferReadBandwidthGbps
+                            // MoraxConfig.BufferReadBandwidthGbps
                         )
                         fb_tstamp[clst_idx] = fb_tstamp[clst_idx] + runtime
                         sqb_t = max(fb_tstamp[clst_idx], sqb_t)
@@ -155,7 +156,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                         runtime = (
                             subq.databulkclass.sizebyte
                             * 8
-                            / MoraxConfig.BufferReadBandwidthGbps
+                            // MoraxConfig.BufferReadBandwidthGbps
                         )
                         wb_tstamp[clst_idx] = wb_tstamp[clst_idx] + runtime
                         sqb_t = max(wb_tstamp[clst_idx], sqb_t)
@@ -163,7 +164,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                     runtime = (
                         subq.databulkclass.sizebyte
                         * 8
-                        / MoraxConfig.BufferWriteBandwidthGbps
+                        // MoraxConfig.BufferWriteBandwidthGbps
                     )
                     rb_tstamp[clst_idx] = max(rb_tstamp[clst_idx], sqb_t) + runtime
                     sqb_t = rb_tstamp[clst_idx]
@@ -215,7 +216,7 @@ def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _ba
             (_layerclass.feature_size - 1) * _layerclass.stride
             + _layerclass.kernel_size
             if layertype == LYR.LinearLayerType.TRCONV
-            else _layerclass.feature_size / _layerclass.stride
+            else _layerclass.feature_size // _layerclass.stride
         )
         O2 = O1
         G = _layerclass.group if layertype == LYR.LinearLayerType.NGCONV else 1
@@ -224,7 +225,7 @@ def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _ba
             _layerclass.kernel_size ** 2
             * _layerclass.in_channel
             * MoraxConfig.PrecisionBits
-            / G
+            // G
         )
     else:
         B = _batch
@@ -242,7 +243,7 @@ def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _ba
 
     # for bat in range(B):
     #     for grp in range(G):
-    fb_runtime = rbulksizebits / MoraxConfig.BufferReadBandwidthGbps
+    fb_runtime = rbulksizebits // MoraxConfig.BufferReadBandwidthGbps
     rram_runtime = (
         (_xbar_size[1] * 1.0 / HWParam.ADCSpeedGbps) * MoraxConfig.PrecisionBits
         + MoraxConfig.RRAMXbarNum
@@ -267,7 +268,7 @@ def schedule_layers(
     _batch=1,
 ):
     # basic mapping unit: slice
-    bytes_per_word = MoraxConfig.PrecisionBits / 8
+    bytes_per_word = MoraxConfig.PrecisionBits // 8
     # generate full-cmos queries
     schduleDAG = SchduleDAG(_modelDAG)
     QR.generate_demmy_queries(schduleDAG, _batch)

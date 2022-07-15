@@ -46,7 +46,7 @@ from morax.system.scratchpad import Scratchpad
 def make_bulklabel(mn, li, bsz, bsd: dict, datatype: str):
     assert datatype in ["WET", "FTR", "VEC", "MAT"]
     bulkform = str()
-    for key, tup in bsd.item():
+    for key, tup in bsd.items():
         """
         if isinstance(val, list):
             bulkform += "_" + key + "_".join(val)
@@ -151,7 +151,7 @@ class ScratchpadBuffer:
                 else:
                     return -1
                     # need inter cluster read or dram read
-        runtime = _q_buffer.databulkclass.sizebyte * 8 / bw if bw != 0 else 0
+        runtime = _q_buffer.databulkclass.sizebyte * 8 // bw if bw != 0 else 0
         biots.update_span(runtime)
         self.TimeFilm.append_stamp_bufferver(biots)
         self.BufferIOList.append(bioatd)

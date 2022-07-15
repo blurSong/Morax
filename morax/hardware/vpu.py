@@ -170,6 +170,6 @@ def run_demmy_query(self, _q_vpu: QueryExcuteOnVPU):
 def get_reducetime(_dim: int):
     add = 0
     while _dim > 1:
-        add += _dim / 2
-        _dim = _dim / 2
+        add += _dim // 2
+        _dim = _dim // 2
     return add

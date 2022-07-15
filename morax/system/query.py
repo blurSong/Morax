@@ -473,15 +473,13 @@ def compileRRAM(
                         fst * xbar_size[0],
                         last,
                     )
-                    bsize = bsize * MoraxConfig.PrecisionBits / 8
+                    bsize = bsize * MoraxConfig.PrecisionBits // 8
                     # for bat in range(_batch):
                     bulk = DataBulk(
                         _modelname, _index + +IIleft, datatype, bsize, bulkscratch
                     )
                     qr = QueryBuffer(bulk, BO.Read, CC.FeatureBuffer, CC.nvTensorCore)
-                    tasklabel = make_tasklabel(
-                        _modelname, _index, taskindex, mxLTD[layertype]
-                    )
+                    tasklabel = make_tasklabel(_modelname, _index, taskindex, "Linear")
                     qr.update_clusterid(clstid)  # add 0521
                     qe = QueryExcuteOnNVTC(
                         _layerclass,
@@ -508,7 +506,7 @@ def compileRRAM(
                 _modelname,
                 _index,
                 "VEC",
-                _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                _layerclass.col_dim * MoraxConfig.PrecisionBits // 8,
                 {"B": bat, "M": (0, _layerclass.col_dim - 1)},
                 token,
             )
@@ -524,7 +522,7 @@ def compileRRAM(
         N = math.ceil(_layerclass.out_channel * 1.0 / xbar_size[1])
         M_tail = _layerclass.in_channel * _layerclass.kernel_size ** 2 % xbar_size[0]
         N_tail = _layerclass.out_channel % xbar_size[1]
-        omapsize = _layerclass.feature_size / _layerclass.stride
+        omapsize = _layerclass.feature_size // _layerclass.stride
         rram_taskindex = -1
         vpu_taskindex = -1
         for bat in range(_batch):
@@ -551,14 +549,14 @@ def compileRRAM(
                     bulkscratch["W"] = (hbegin, hend)
                     bulkscratch["H"] = (wbegin, wend)
                     if IIright != 0:
-                        bulkscratch["C"] = (0, _layerclass.in_channel / 2 - 1)
+                        bulkscratch["C"] = (0, _layerclass.in_channel // 2 - 1)
                     else:
                         bulkscratch["C"] = (0, _layerclass.in_channel - 1)
                     bsize = (
                         _layerclass.kernel_size
                         * _layerclass.in_channel
                         * MoraxConfig.PrecisionBits
-                        / 8
+                        // 8
                     )
                     bsize *= (
                         _layerclass.kernel_size if col_iter == 0 else _layerclass.stride
@@ -617,7 +615,7 @@ def compileRRAM(
                         _modelname,
                         _index,
                         "FTR",
-                        _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
+                        _layerclass.out_channel * MoraxConfig.PrecisionBits // 8,
                         wbscratch,
                         token,
                     )
@@ -655,15 +653,15 @@ def compileRRAM(
                         bulkscratch = {}
                         bulkscratch["B"] = bat
                         bulkscratch["W"] = (
-                            col_iter / _layerclass.stride - 1,
-                            col_iter / _layerclass.stride - 1,
+                            col_iter // _layerclass.stride - 1,
+                            col_iter // _layerclass.stride - 1,
                         )
                         bulkscratch["H"] = (
-                            row_iter / _layerclass.stride - 1,
-                            row_iter / _layerclass.stride - 1,
+                            row_iter // _layerclass.stride - 1,
+                            row_iter // _layerclass.stride - 1,
                         )
                         bulkscratch["C"] = (0, _layerclass.in_channel - 1)
-                        bsize = _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                        bsize = _layerclass.in_channel * MoraxConfig.PrecisionBits // 8
                         bulk = DataBulk(
                             _modelname, _index + IIleft, datatype, bsize, bulkscratch
                         )
@@ -712,7 +710,7 @@ def compileRRAM(
                         _modelname,
                         _index,
                         "FTR",
-                        _layerclass.out_channel * MoraxConfig.PrecisionBits / 8,
+                        _layerclass.out_channel * MoraxConfig.PrecisionBits // 8,
                         wbscratch,
                         token,
                     )
@@ -732,16 +730,16 @@ def compileRRAM(
             (_layerclass.out_channel / _layerclass.group) * 1.0 / xbar_size[1]
         )
         M_tail = (
-            (_layerclass.in_channel / _layerclass.group)
+            (_layerclass.in_channel // _layerclass.group)
             * _layerclass.kernel_size ** 2
             / xbar_size[0]
         )
-        N_tail = (_layerclass.out_channel / _layerclass.group) / xbar_size[1]
+        N_tail = (_layerclass.out_channel // _layerclass.group) / xbar_size[1]
         rram_taskindex = -1
         vpu_taskindex = -1
-        group_inchannel = _layerclass.in_channel / _layerclass.group
-        group_outchannel = _layerclass.out_channel / _layerclass.group
-        omapsize = _layerclass.feature_size / _layerclass.stride
+        group_inchannel = _layerclass.in_channel // _layerclass.group
+        group_outchannel = _layerclass.out_channel // _layerclass.group
+        omapsize = _layerclass.feature_size // _layerclass.stride
         for bat in range(_batch):
             for grp in range(_layerclass.group):
                 for row_iter in range(omapsize):
@@ -777,7 +775,7 @@ def compileRRAM(
                         bsize = (
                             _layerclass.kernel_size
                             * group_inchannel
-                            * (MoraxConfig.PrecisionBits / 8)
+                            * (MoraxConfig.PrecisionBits // 8)
                         )
                         bsize *= (
                             _layerclass.kernel_size
@@ -834,7 +832,7 @@ def compileRRAM(
                             _modelname,
                             _index,
                             "FTR",
-                            group_outchannel * (MoraxConfig.PrecisionBits / 8),
+                            group_outchannel * (MoraxConfig.PrecisionBits // 8),
                             wbscratch,
                             token,
                         )
@@ -922,7 +920,7 @@ def compileRRAM(
                             fst * xbar_size[0],
                             last,
                         )
-                        bsize = vfetch * bsize * MoraxConfig.PrecisionBits / 8
+                        bsize = vfetch * bsize * MoraxConfig.PrecisionBits // 8
                         bulk = DataBulk(
                             _modelname, _index + iidx, datatype, bsize, bulkscratch
                         )
@@ -961,7 +959,7 @@ def compileRRAM(
                         _modelname,
                         _index,
                         "MAT",
-                        n_dim * MoraxConfig.PrecisionBits / 8,
+                        n_dim * MoraxConfig.PrecisionBits // 8,
                         {"B": bat, "M": line + vf * vfetch, "N": (0, n_dim - 1)},
                         token,
                     )
@@ -1024,7 +1022,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 _modelname,
                 _index + IIleft,
                 datatype,
-                B * MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8,
+                B * MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits // 8,
                 fbulkscratch,
             )
             qrf = QueryBuffer(fbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1052,7 +1050,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 for b in range(B):
                     cmos_taskindex += 1
                     ctasklabel = make_tasklabel(
-                        _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                        _modelname, _index, cmos_taskindex, "Linear"
                     )
                     if n == N - 1 and N_tail > 0:
                         tasksize_list = copy.deepcopy(make_tc_task_list(N_tail))
@@ -1060,13 +1058,15 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         tasksize_list = [
                             (MoraxConfig.PEArraySize, MoraxConfig.PEArraySize)
                         ] * MoraxConfig.PEArrayNum
-                    tcbulksize = MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits / 8
+                    tcbulksize = (
+                        MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits // 8
+                    )
                     if b == 0:
                         tcbulksize += (
                             sum(tasksize_list)
                             * MoraxConfig.PEArraySize
                             * MoraxConfig.PrecisionBits
-                            / 8
+                            // 8
                         )
                     qe = QueryExcuteOnTC(
                         _layerclass,
@@ -1099,7 +1099,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 _modelname,
                 _index,
                 "VEC",
-                _layerclass.col_dim * MoraxConfig.PrecisionBits / 8,
+                _layerclass.col_dim * MoraxConfig.PrecisionBits // 8,
                 {"B": b, "M": (0, _layerclass.col_dim - 1)},
                 token,
             )
@@ -1130,7 +1130,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
         W_tail = H_tail
         B = _batch
-        omapsize = _layerclass.feature_size / _layerclass.stride
+        omapsize = _layerclass.feature_size // _layerclass.stride
         # Spcify os task
         assigned_pearray = 0
         listof_tasksize_listoftup = []
@@ -1141,13 +1141,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    cc = (assigned_pearray + peid) / (H * W)
-                    hh = (assigned_pearray + peid) % (H * W) / W
+                    cc = (assigned_pearray + peid) // (H * W)
+                    hh = (assigned_pearray + peid) % (H * W) // W
                     ww = (assigned_pearray + peid) % (H * W) % W
                     if peid == 0:
                         [cb, ce] = [cc, cc]
@@ -1199,7 +1199,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 * _layerclass.in_channel
                 * chnum
                 * MoraxConfig.PrecisionBits
-                / 8
+                // 8
             )
             wbulk = DataBulk(_modelname, _index, "WET", wbulksize, wbulkscratch,)
             qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
@@ -1219,7 +1219,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 )
                 fosize += pe_tasksize_tup[0] * pe_tasksize_tup[1]
             inch = (
-                _layerclass.in_channel if IIright == 0 else _layerclass.in_channel / 2
+                _layerclass.in_channel if IIright == 0 else _layerclass.in_channel // 2
             )
             ifbulkscratch = {}
             ifbulkscratch["C"] = (0, inch - 1)
@@ -1263,7 +1263,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     "FTR",
-                    finsize * inch * MoraxConfig.PrecisionBits / 8,
+                    finsize * inch * MoraxConfig.PrecisionBits // 8,
                     ifbulkscratch,
                 )
                 qrf = QueryBuffer(ifbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1273,18 +1273,16 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         _modelname,
                         _index + IIright,
                         "FTR",
-                        finsize * inch * MoraxConfig.PrecisionBits / 8,
+                        finsize * inch * MoraxConfig.PrecisionBits // 8,
                         ifbulkscratch,
                     )
-                qrf2 = QueryBuffer(ifbulk2, BO.Read, ICtypeRight, CC.TensorCore)
-                SubQueryList.append(copy.deepcopy(qrf2))
+                    qrf2 = QueryBuffer(ifbulk2, BO.Read, ICtypeRight, CC.TensorCore)
+                    SubQueryList.append(copy.deepcopy(qrf2))
                 # Make query
                 cmos_taskindex += 1
-                tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
-                )
+                tctasklabel = make_tasklabel(_modelname, _index, cmos_taskindex, "CONV")
                 tcbulksize = (
-                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits // 8
                 )
                 if bat == 0:
                     tcbulksize += wbulksize
@@ -1302,7 +1300,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     "FTR",
-                    fosize * MoraxConfig.PrecisionBits / 8,
+                    fosize * MoraxConfig.PrecisionBits // 8,
                     ofbulkscratch,
                     token,
                 )
@@ -1332,7 +1330,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         H_tail = _layerclass.feature_size % MoraxConfig.PEArraySize
         W_tail = H_tail
         B = _batch
-        omapsize = _layerclass.feature_size / _layerclass.stride
+        omapsize = _layerclass.feature_size // _layerclass.stride
         # Spcify os task
         assigned_pearray = 0
         listof_tasksize_listoftup = []
@@ -1343,13 +1341,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    cc = (assigned_pearray + peid) / (H * W)
-                    hh = (assigned_pearray + peid) % (H * W) / W
+                    cc = (assigned_pearray + peid) // (H * W)
+                    hh = (assigned_pearray + peid) % (H * W) // W
                     ww = (assigned_pearray + peid) % (H * W) % W
                     if peid == 0:
                         [cb, ce] = [cc, cc]
@@ -1396,7 +1394,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             wbulkscratch["RS"] = 0
             wbulkscratch["C"] = 0
             wbulksize = (
-                _layerclass.kernel_size ** 2 * chnum * MoraxConfig.PrecisionBits / 8
+                _layerclass.kernel_size ** 2 * chnum * MoraxConfig.PrecisionBits // 8
             )
             wbulk = DataBulk(_modelname, _index, "WET", wbulksize, wbulkscratch,)
             qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
@@ -1456,7 +1454,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     "FTR",
-                    finsize * MoraxConfig.PrecisionBits / 8,
+                    finsize * MoraxConfig.PrecisionBits // 8,
                     ifbulkscratch,
                 )
                 qrf = QueryBuffer(ifbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1464,9 +1462,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 # Make query
                 cmos_taskindex += 1
                 tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    _modelname, _index, cmos_taskindex, "DWCONV"
                 )
-                tcbulksize = finsize * MoraxConfig.PrecisionBits / 8
+                tcbulksize = finsize * MoraxConfig.PrecisionBits // 8
                 if bat == 0:
                     tcbulksize += wbulksize
                 qe = QueryExcuteOnTC(
@@ -1483,7 +1481,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     "FTR",
-                    fosize * MoraxConfig.PrecisionBits / 8,
+                    fosize * MoraxConfig.PrecisionBits // 8,
                     ofbulkscratch,
                     token,
                 )
@@ -1514,13 +1512,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    cc = (assigned_pearray + peid) / (H * W)
-                    hh = (assigned_pearray + peid) % (H * W) / W
+                    cc = (assigned_pearray + peid) // (H * W)
+                    hh = (assigned_pearray + peid) % (H * W) // W
                     ww = (assigned_pearray + peid) % (H * W) % W
                     if peid == 0:
                         [cb, ce] = [cc, cc]
@@ -1571,7 +1569,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 * _layerclass.in_channel
                 * chnum
                 * MoraxConfig.PrecisionBits
-                / 8
+                // 8
             )
             wbulk = DataBulk(_modelname, _index, "WET", wbulksize, wbulkscratch,)
             qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
@@ -1594,16 +1592,16 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             ifbulkscratch["C"] = (0, _layerclass.in_channel - 1)
             # NOTE To avoid misellaneous, Morax use avg infeature num for evaluation
             hbegin = (
-                taskid * _layerclass.feature_size ** 2 / TSK
+                taskid * _layerclass.feature_size ** 2 // TSK
             ) / _layerclass.feature_size
             hend = (
-                (taskid + 1) * _layerclass.feature_size ** 2 / TSK
+                (taskid + 1) * _layerclass.feature_size ** 2 // TSK
             ) / _layerclass.feature_size
             wbegin = (
-                taskid * _layerclass.feature_size ** 2 / TSK
+                taskid * _layerclass.feature_size ** 2 // TSK
             ) % _layerclass.feature_size
             wend = (
-                (taskid + 1) * _layerclass.feature_size ** 2 / TSK
+                (taskid + 1) * _layerclass.feature_size ** 2 // TSK
             ) % _layerclass.feature_size
             ifbulkscratch["H"] = (
                 (hbegin, hend)
@@ -1623,7 +1621,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     "FTR",
-                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8,
+                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits // 8,
                     ifbulkscratch,
                 )
                 qrf = QueryBuffer(ifbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1631,10 +1629,10 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 # Make query
                 cmos_taskindex += 1
                 tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    _modelname, _index, cmos_taskindex, "TRCONV"
                 )
                 tcbulksize = (
-                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits / 8
+                    finsize * _layerclass.in_channel * MoraxConfig.PrecisionBits // 8
                 )
                 if bat == 0:
                     tcbulksize += wbulksize
@@ -1652,7 +1650,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     "FTR",
-                    fosize * MoraxConfig.PrecisionBits / 8,
+                    fosize * MoraxConfig.PrecisionBits // 8,
                     ofbulkscratch,
                     token,
                 )
@@ -1687,9 +1685,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         W_tail = H_tail
         B = _batch
         G = _layerclass.group
-        omapsize = _layerclass.feature_size / _layerclass.stride
-        group_inc = _layerclass.in_channel / _layerclass.group
-        group_outc = _layerclass.out_channel / _layerclass.group
+        omapsize = _layerclass.feature_size // _layerclass.stride
+        group_inc = _layerclass.in_channel // _layerclass.group
+        group_outc = _layerclass.out_channel // _layerclass.group
         for grp in range(G):
             # Spcify OS task
             assigned_pearray = 0
@@ -1701,13 +1699,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 [hb, he] = [0, 0]
                 [wb, we] = [0, 0]
                 for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                    pe_tasksize_tup = []
+                    pe_tasksize_tup = [0, 0]
                     if assigned_pearray + peid >= P:  # last outofrange pes
                         pe_tasksize_tup[0] = 0
                         pe_tasksize_tup[1] = 0
                     else:
-                        cc = (assigned_pearray + peid) / (H * W)
-                        hh = (assigned_pearray + peid) % (H * W) / W
+                        cc = (assigned_pearray + peid) // (H * W)
+                        hh = (assigned_pearray + peid) % (H * W) // W
                         ww = (assigned_pearray + peid) % (H * W) % W
                         if peid == 0:
                             [cb, ce] = [cc, cc]
@@ -1761,7 +1759,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     * group_inc
                     * chnum
                     * MoraxConfig.PrecisionBits
-                    / 8
+                    // 8
                 )
                 wbulk = DataBulk(_modelname, _index, "WET", wbulksize, wbulkscratch,)
                 qrw = QueryBuffer(wbulk, BO.Read, CC.WeightBuffer, CC.TensorCore)
@@ -1822,7 +1820,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         _modelname,
                         _index + IIleft,
                         "FTR",
-                        finsize * group_inc * MoraxConfig.PrecisionBits / 8,
+                        finsize * group_inc * MoraxConfig.PrecisionBits // 8,
                         ifbulkscratch,
                     )
                     qrf = QueryBuffer(ifbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1830,9 +1828,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     # Make query
                     cmos_taskindex += 1
                     tctasklabel = make_tasklabel(
-                        _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                        _modelname, _index, cmos_taskindex, "NGCONV"
                     )
-                    tcbulksize = finsize * group_inc * MoraxConfig.PrecisionBits / 8
+                    tcbulksize = finsize * group_inc * MoraxConfig.PrecisionBits // 8
                     if bat == 0:
                         tcbulksize += wbulksize
                     qe = QueryExcuteOnTC(
@@ -1849,7 +1847,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                         _modelname,
                         _index,
                         "FTR",
-                        fosize * MoraxConfig.PrecisionBits / 8,
+                        fosize * MoraxConfig.PrecisionBits // 8,
                         ofbulkscratch,
                         token,
                     )
@@ -1888,13 +1886,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    cc = (assigned_pearray + peid) / (H * W)
-                    hh = (assigned_pearray + peid) % (H * W) / W
+                    cc = (assigned_pearray + peid) // (H * W)
+                    hh = (assigned_pearray + peid) % (H * W) // W
                     ww = (assigned_pearray + peid) % (H * W) % W
                     if peid == 0:
                         [cb, ce] = [cc, cc]
@@ -1954,14 +1952,14 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     datatype,
-                    fsize * MoraxConfig.PrecisionBits / 8,
+                    fsize * MoraxConfig.PrecisionBits // 8,
                     iobulkscratch,
                 )
                 bulkright = DataBulk(
                     _modelname,
                     _index + IIright,
                     datatype,
-                    fsize * MoraxConfig.PrecisionBits / 8,
+                    fsize * MoraxConfig.PrecisionBits // 8,
                     iobulkscratch,
                 )
                 qrl = QueryBuffer(bulkleft, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -1971,9 +1969,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 # Make query
                 cmos_taskindex += 1
                 tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    _modelname, _index, cmos_taskindex, "Residual"
                 )
-                tcbulksize = fsize * 2 * MoraxConfig.PrecisionBits / 8
+                tcbulksize = fsize * 2 * MoraxConfig.PrecisionBits // 8
                 qe = QueryExcuteOnTC(
                     _layerclass,
                     tctasklabel,
@@ -1988,7 +1986,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     datatype,
-                    fosize * MoraxConfig.PrecisionBits / 8,
+                    fosize * MoraxConfig.PrecisionBits // 8,
                     iobulkscratch,
                     token,
                 )
@@ -2016,13 +2014,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    cc = (assigned_pearray + peid) / (H * W)
-                    hh = (assigned_pearray + peid) % (H * W) / W
+                    cc = (assigned_pearray + peid) // (H * W)
+                    hh = (assigned_pearray + peid) % (H * W) // W
                     ww = (assigned_pearray + peid) % (H * W) % W
                     if peid == 0:
                         [cb, ce] = [cc, cc]
@@ -2070,9 +2068,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             # Make LUT Query
             for chn in range(bulkscratch["C"][0], bulkscratch["C"][1] + 1, 1):
                 lut_taskindex += 1
-                luttasklabel = make_tasklabel(
-                    _modelname, _index, lut_taskindex, mxLTD[layertype]
-                )
+                luttasklabel = make_tasklabel(_modelname, _index, lut_taskindex, "LUT")
                 lutadress = get_lookup_adress(
                     layertype, chn
                 )  # tup3(clstid, nvtcid, sliceid)
@@ -2096,7 +2092,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     "FTR",
-                    fsize * MoraxConfig.PrecisionBits / 8,
+                    fsize * MoraxConfig.PrecisionBits // 8,
                     bulkscratch,
                 )
                 qr = QueryBuffer(inbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -2104,9 +2100,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 # Make query
                 cmos_taskindex += 1
                 tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    _modelname, _index, cmos_taskindex, "Batchnorm"
                 )
-                tcbulksize = fsize * MoraxConfig.PrecisionBits / 8
+                tcbulksize = fsize * MoraxConfig.PrecisionBits // 8
                 qe = QueryExcuteOnTC(
                     _layerclass,
                     tctasklabel,
@@ -2143,12 +2139,12 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    hh = (assigned_pearray + peid) / W
+                    hh = (assigned_pearray + peid) // W
                     ww = (assigned_pearray + peid) % W
                     if peid == 0:
                         [hb, he] = [hh, hh]
@@ -2190,9 +2186,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         for bat in range(B):
             # Make LUT
             lut_taskindex += 1
-            luttasklabel = make_tasklabel(
-                _modelname, _index, lut_taskindex, mxLTD[layertype]
-            )
+            luttasklabel = make_tasklabel(_modelname, _index, lut_taskindex, "LUT")
             lutadress = get_lookup_adress(
                 layertype, bat
             )  # tup3(clstid, nvtcid, sliceid)
@@ -2218,7 +2212,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index + IIleft,
                     "MAT",
-                    fsize * MoraxConfig.PrecisionBits / 8,
+                    fsize * MoraxConfig.PrecisionBits // 8,
                     bulkscratch,
                 )
                 qr = QueryBuffer(inbulk, BO.Read, ICtypeLeft, CC.TensorCore)
@@ -2226,9 +2220,9 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                 # Make query
                 cmos_taskindex += 1
                 tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
+                    _modelname, _index, cmos_taskindex, "Layernorm"
                 )
-                tcbulksize = fsize * MoraxConfig.PrecisionBits / 8
+                tcbulksize = fsize * MoraxConfig.PrecisionBits // 8
                 qe = QueryExcuteOnTC(
                     _layerclass,
                     tctasklabel,
@@ -2273,12 +2267,12 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
             [hb, he] = [0, 0]
             [wb, we] = [0, 0]
             for peid in range(MoraxConfig.PEArrayNum):  # 0 - num-1
-                pe_tasksize_tup = []
+                pe_tasksize_tup = [0, 0]
                 if assigned_pearray + peid >= P:  # last outofrange pes
                     pe_tasksize_tup[0] = 0
                     pe_tasksize_tup[1] = 0
                 else:
-                    hh = (assigned_pearray + peid) / W
+                    hh = (assigned_pearray + peid) // W
                     ww = (assigned_pearray + peid) % W
                     if peid == 0:
                         [hb, he] = [hh, hh]
@@ -2373,9 +2367,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     SubQueryList.append(copy.deepcopy(qrr))
                 # Make query
                 cmos_taskindex += 1
-                tctasklabel = make_tasklabel(
-                    _modelname, _index, cmos_taskindex, mxLTD[layertype]
-                )
+                tctasklabel = make_tasklabel(_modelname, _index, cmos_taskindex, "GEMM")
                 # Get bulksize
                 if IIleft == 0 and IIright < 0:
                     tcbulksize = insize_r
@@ -2404,7 +2396,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     "MAT",
-                    fosize * MoraxConfig.PrecisionBits / 8,
+                    fosize * MoraxConfig.PrecisionBits // 8,
                     obulkscratch,
                     token,
                 )
@@ -2426,7 +2418,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
     if layertype == NLT.Pooling:
         B = _batch
         C = _layerclass.channel
-        ofsize = _layerclass.feature_size / _layerclass.kernel_size
+        ofsize = _layerclass.feature_size // _layerclass.kernel_size
         # [REW]
         for bat in range(B):
             for ch in range(C):
@@ -2437,7 +2429,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 fbulkscratch["H"] = (0, _layerclass.feature_size - 1)
                 fbulkscratch["W"] = (0, _layerclass.feature_size - 1)
                 fbulkscratch["C"] = ch
-                fbs = _layerclass.feature_size ** 2 * MoraxConfig.PrecisionBits / 8
+                fbs = _layerclass.feature_size ** 2 * MoraxConfig.PrecisionBits // 8
                 fbulk = DataBulk(
                     _modelname,
                     _index + _layerclass.input_indecies_tuple[0],
@@ -2450,12 +2442,12 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 # query
                 vpu_taskindex += 1
                 vtasklabel = make_tasklabel(
-                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                    _modelname, _index, vpu_taskindex, "Pooling"
                 )
                 qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Linear", NLT.Pooling,)
                 SubQueryList.append(copy.deepcopy(qv))
                 # wb
-                wbs = ofsize ** 2 * MoraxConfig.PrecisionBits / 8
+                wbs = ofsize ** 2 * MoraxConfig.PrecisionBits // 8
                 wbulkscratch = {
                     "B": bat,
                     "C": ch,
@@ -2485,7 +2477,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 elif layertype == NLT.Softmax1D:
                     datatype = "VEC"
                     rbulkscratch["M"] = (0, V)
-                rbsize = V * MoraxConfig.PrecisionBits / 8
+                rbsize = V * MoraxConfig.PrecisionBits // 8
                 rbulk = DataBulk(
                     _modelname,
                     _index + _layerclass.input_indecies_tuple[0],
@@ -2498,14 +2490,14 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 # vmax
                 vpu_taskindex += 1
                 vtasklabel = make_tasklabel(
-                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                    _modelname, _index, vpu_taskindex, "Softmax"
                 )
                 qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Softmax", SO.VMAX,)
                 SubQueryList.append(copy.deepcopy(qv))
                 # SO.Truncation
                 smu_taskindex += 1
                 stasklabel = make_tasklabel(
-                    _modelname, _index, smu_taskindex, mxNTD[layertype]
+                    _modelname, _index, smu_taskindex, "Softmax"
                 )
                 qsmu = QueryExcuteOnSMU(
                     _layerclass, stasklabel, "UpStream", SO.Truncation,
@@ -2515,7 +2507,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 for v in range(V):
                     lut_taskindex += 1
                     luttasklabel = make_tasklabel(
-                        _modelname, _index, lut_taskindex, mxLTD[layertype]
+                        _modelname, _index, lut_taskindex, "LUT"
                     )
                     lutadress = get_lookup_adress(_index, line)
                     qlut = QueryExcuteOnNVTC(
@@ -2531,9 +2523,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 # norm
                 # lutdiv
                 lut_taskindex += 1
-                luttasklabel = make_tasklabel(
-                    _modelname, _index, lut_taskindex, mxLTD[layertype]
-                )
+                luttasklabel = make_tasklabel(_modelname, _index, lut_taskindex, "LUT")
                 lutadress = get_lookup_adress(_index, line)
                 qlut = QueryExcuteOnNVTC(
                     _layerclass,
@@ -2548,7 +2538,7 @@ def compileVPU(_index, _modelname, _layerclass, _batch, _token):
                 # vnrom
                 vpu_taskindex += 1
                 vtasklabel = make_tasklabel(
-                    _modelname, _index, vpu_taskindex, mxNTD[layertype]
+                    _modelname, _index, vpu_taskindex, "Softmax"
                 )
                 qv = QueryExcuteOnVPU(_layerclass, vtasklabel, "Softmax", SO.VNORM,)
                 SubQueryList.append(copy.deepcopy(qv))

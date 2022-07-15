@@ -25,14 +25,14 @@ class Mapper:
             * CFG.MoraxConfig.RRAMXbarSize
             * (CFG.MoraxConfig.RRAMXbarSize - self.lut_row)
             * CFG.MoraxConfig.RRAMCellBits
-            / 8
+            // 8
         )
         self.xbar_size = (
             CFG.MoraxConfig.RRAMXbarSize - self.lut_row,
             CFG.MoraxConfig.RRAMXbarSize,
         )
         self.bars_per_word = (
-            CFG.MoraxConfig.PrecisionBits / CFG.MoraxConfig.RRAMCellBits
+            CFG.MoraxConfig.PrecisionBits // CFG.MoraxConfig.RRAMCellBits
         )
         self.mapper_breakpoint = [0, 0, 0]  # clstid nvtcid sliceid
 
@@ -45,10 +45,10 @@ class Mapper:
         col_par = math.ceil(_col_l * 1.0 / self.xbar_size[0])
         if _COL_MAJOR:
             row_id = slice_idx % row_par
-            col_id = slice_idx / row_par
+            col_id = slice_idx // row_par
         else:
             row_id = slice_idx % col_par
-            col_id = slice_idx / col_par
+            col_id = slice_idx // col_par
         mvm_row = (
             self.xbar_size[0] if row_id < row_par - 1 else _row_l % self.xbar_size[0]
         )
@@ -77,7 +77,7 @@ class Mapper:
             _slice_num = _slice_num - snum
             self.mapper_breakpoint[2] = end % CFG.MoraxConfig.RRAMSliceNum
             if end == CFG.MoraxConfig.RRAMSliceNum:
-                if (self.mapper_breakpoint[1] + 1) / CFG.MoraxConfig.NVTCNum > 0:
+                if (self.mapper_breakpoint[1] + 1) // CFG.MoraxConfig.NVTCNum > 0:
                     self.mapper_breakpoint[0] = self.mapper_breakpoint[0] + 1
                 self.mapper_breakpoint[1] = (
                     self.mapper_breakpoint[1] + 1
@@ -113,7 +113,7 @@ class Mapper:
                     True,
                 )
                 [clstid, nvtcid, sliceid] = self.mapper_breakpoint
-                slice_num = xbar_num / self.bars_per_word
+                slice_num = xbar_num // self.bars_per_word
                 for s_idx in range(0, slice_num):
                     mapping_info, mvm_row, mvm_col = self.get_mapping_info(
                         _modelDAG.modelname, orli, row_l, col_l, s_idx

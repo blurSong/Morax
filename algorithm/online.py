@@ -14,7 +14,7 @@ class Schduler:
         self.CschduleList = copy.deepcopy(_CschduleList)
 
     def schedule_one_layer(
-        self, _candidatelayerlist: list, _modelDAG: ModelDAG, _clusterlist: list
+        self, _candidatelayerlist: list, _modelDAG: ModelDAG,
     ):
         # idx
         thisrun_index = -1

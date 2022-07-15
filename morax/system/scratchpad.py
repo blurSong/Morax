@@ -428,7 +428,7 @@ class Scratchpad:
                     ):
                         # if scratchpad_dict['C'][0] <= ctup[0] and scratchpad_dict['C'][1] >= ctup[1]:
                         if isrange(check_range(ctup[0], ctup[1], scratchpad_dict["C"])):
-                            transmission_bulksize += _bulk.bulksizebyte / lenk
+                            transmission_bulksize += _bulk.bulksizebyte // lenk
             elif _bulk.datatype == "FTR":
                 # BCHW
                 bint = _bulk.bulkscratch["B"]
@@ -453,8 +453,8 @@ class Scratchpad:
                                 else scratchpad_dict["H"][0]
                             )
                             transmission_bulksize += (
-                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
-                            ) * ((htup[1] - hb0 + 1) / (htup[1] - htup[0] + 1))
+                                _bulk.bulksizebyte // (ctup[1] - ctup[0] + 1)
+                            ) * ((htup[1] - hb0 + 1) // (htup[1] - htup[0] + 1))
                         if ch1 == scratchpad_dict["C"][1]:
                             entcnum -= 1
                             hb1 = (
@@ -463,11 +463,11 @@ class Scratchpad:
                                 else scratchpad_dict["H"][1]
                             )
                             transmission_bulksize += (
-                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
-                            ) * ((hb1 - htup[0] + 1) / (htup[1] - htup[0] + 1))
+                                _bulk.bulksizebyte // (ctup[1] - ctup[0] + 1)
+                            ) * ((hb1 - htup[0] + 1) // (htup[1] - htup[0] + 1))
                         if entcnum > 0:
                             transmission_bulksize += (
-                                _bulk.bulksizebyte / (ctup[1] - ctup[0] + 1)
+                                _bulk.bulksizebyte // (ctup[1] - ctup[0] + 1)
                             ) * entcnum
             elif _bulk.datatype == "VEC":
                 # BM
@@ -499,7 +499,7 @@ class Scratchpad:
                         m0 = mtup[0]
                         m1 = mtup[1]
                     transmission_bulksize += (
-                        _bulk.bulksizebyte * (m1 - m0 + 1) / (mtup[1] - mtup[0] + 1)
+                        _bulk.bulksizebyte * (m1 - m0 + 1) // (mtup[1] - mtup[0] + 1)
                     )
             # endif
             return transmission_bulksize

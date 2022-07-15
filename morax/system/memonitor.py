@@ -1,7 +1,7 @@
 # from morax.hardware.buffer import DataBulk
+import copy
 from morax.system.config import MoraxConfig
 from morax.system.query import QueryRingBus, QueryDMA
-import copy
 from morax.system.interface import *
 from morax.frontend.api import (
     get_layer_scratchdict,
@@ -9,6 +9,7 @@ from morax.frontend.api import (
     get_weight_scratchdict,
     get_weight_datatype,
 )
+
 
 #  a cheat-sheet to record the locations and token of mm_idx_type
 class Memonitor:

@@ -115,7 +115,7 @@ class RRAMSlice:
             self.RRAMSliceMVMAction.RegRead = self.EightXbar["mvmrow"]
             self.RRAMSliceMVMAction.MVMAcc = self.EightXbar["mvmcol"]
             runtime = (
-                int(self.EightXbar["mvmcol"] / HWParam.ADCSpeedGbps)
+                int(self.EightXbar["mvmcol"] // HWParam.ADCSpeedGbps)
                 * MoraxConfig.PrecisionBits
                 + MoraxConfig.RRAMXbarNum
                 + 1

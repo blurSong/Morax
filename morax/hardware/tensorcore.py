@@ -123,7 +123,7 @@ class PEArray:
             N = _q_pearray["subtasksize"][1]
             K = _layerclass.kernel_size
             CO = _layerclass.in_channel
-            CP = CO / _layerclass.group
+            CP = CO // _layerclass.group
             ad.MAC = M * N * K * K * CP
             ad.LBRead = K * K * CP + (N + K - 1) * (M + K - 1) * CP
             ad.LBWrite = M * N
@@ -184,11 +184,11 @@ class TensorCoreNOC:
             tslist.append(tsf)
         tssum = sum(tslist)
         for fob in range(self.fanoutbus):
-            bs = _bulksize * tslist[fob] / tssum
+            bs = _bulksize * tslist[fob] // tssum
             ncl.append(bs)
         self.NOCCastList.append(ncl)
         # add NOC Cast time to update submit_t
-        submit_t = _issue_t + max(ncl) * MoraxConfig.PrecisionBits / self.nocbw
+        submit_t = _issue_t + max(ncl) * MoraxConfig.PrecisionBits // self.nocbw
         return submit_t
 
 

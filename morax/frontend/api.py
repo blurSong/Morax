@@ -33,8 +33,8 @@ def get_layer_scratchdict(_layerclass):
     elif layertype in [LLT.CONV, LLT.NGCONV]:
         scratchpad_dict = {
             "C": _layerclass.out_channel,
-            "H": _layerclass.feature_size / _layerclass.stride,
-            "W": _layerclass.feature_size / _layerclass.stride,
+            "H": _layerclass.feature_size // _layerclass.stride,
+            "W": _layerclass.feature_size // _layerclass.stride,
         }
     elif layertype == LLT.TRCONV:
         omapsize = (
@@ -48,8 +48,8 @@ def get_layer_scratchdict(_layerclass):
     elif layertype == LLT.DWCONV:
         scratchpad_dict = {
             "C": _layerclass.channel,
-            "H": _layerclass.feature_size / _layerclass.stride,
-            "W": _layerclass.feature_size / _layerclass.stride,
+            "H": _layerclass.feature_size // _layerclass.stride,
+            "W": _layerclass.feature_size // _layerclass.stride,
         }
     elif layertype in [LLT.Residual, LLT.Batchnorm]:
         scratchpad_dict = {
@@ -68,8 +68,8 @@ def get_layer_scratchdict(_layerclass):
     elif layertype == NLT.Pooling:
         scratchpad_dict = {
             "C": _layerclass.channel,
-            "H": _layerclass.feature_size / _layerclass.stride,
-            "W": _layerclass.feature_size / _layerclass.stride,
+            "H": _layerclass.feature_size // _layerclass.stride,
+            "W": _layerclass.feature_size // _layerclass.stride,
         }
     elif layertype == NLT.Softmax1D:
         scratchpad_dict = {"M": _layerclass.v_dim}

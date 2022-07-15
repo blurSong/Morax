@@ -30,7 +30,7 @@ class SMU:
         self.TimeFilm = TimeFilm()
         self.SMUActionList = []
         self.regfile = (
-            MoraxConfig.SMURegFileSizeKB * 1024 * 8 / MoraxConfig.PrecisionBits
+            MoraxConfig.SMURegFileSizeKB * 1024 * 8 // MoraxConfig.PrecisionBits
         )
         self.Busy = False
 
@@ -44,7 +44,7 @@ class SMU:
         if q_smu.execution == SMUExe[0]:
             M = q_smu.tasksize[0]
             N = q_smu.tasksize[1]
-            runtime = N * M / self.regfile
+            runtime = N * M // self.regfile
             smad.Act = M * N
         # SO.Truncation
         if q_smu.execution == SMUExe[1]:
@@ -53,14 +53,14 @@ class SMU:
                 if isinstance(q_smu.layerclass, Softmax1D)
                 else q_smu.layerclass.col_dim
             )
-            runtime = V / self.regfile
+            runtime = V // self.regfile
             smad.Act = V
         # SO.HWNC2CHWN SO.CHWN2HWNC
         assert q_smu.dfmod == "UpStream"
         if q_smu.execution == SMUExe[2] or q_smu.execution == SMUExe[3]:
             M = q_smu.tasksize[0]
             N = q_smu.tasksize[1]
-            runtime = N * M / self.regfile
+            runtime = N * M // self.regfile
             smad.Act = M * N
         smts.update_span(runtime)
         self.TimeFilm.append_stamp(smts)

@@ -13,14 +13,11 @@ import multiprocessing as MP
 import copy
 import re
 
-from regex import R
-
 import morax.system.interface as IF
-import morax.system.query as QR
 import morax.system.timefilm as TF
 import morax.system.config as CFG
 import morax.system.memonitor as MM
-import morax.system.schedule as SCH
+import morax.system.query as QR
 from morax.model.model import ModelDAG
 from algorithm import online as OL
 
@@ -50,7 +47,7 @@ class MoraxChip:
             # 0.1 choose one layer, report layer index and issue_time
             # TODO OL.schedule_one_layer
             thisrun_index, LAYER_ISSUE_TIME = Schduler.schedule_one_layer(
-                CandidateLayerList, _modelDAG, self.ClusterList
+                CandidateLayerList, _modelDAG,
             )
 
             # 0.2 update candidate list
@@ -100,6 +97,7 @@ class MoraxChip:
                     used_cluster_id.append(this_clusterid)
                 """"""
                 # run this q bulk
+                LAYER_SUBMIT_TIME = LAYER_ISSUE_TIME
                 ISSUE_T = LAYER_ISSUE_TIME
                 SUBMIT_T = ISSUE_T
                 SUBMIT_T_0 = ISSUE_T
@@ -123,7 +121,6 @@ class MoraxChip:
                                 thisrun_index,
                                 ThisLayerQuery.layerclass,
                             )
-                    """"""
                     # 1.2 run extra_queries
                     EXTRA_T = LAYER_ISSUE_TIME
                     if extra_queries:
@@ -140,7 +137,6 @@ class MoraxChip:
                             self.RingBus.run_query_then_write_buffer(
                                 this_subquery, self.ClusterList
                             )
-                    """"""
                     # 1.3 run this_subquery
                     if isinstance(this_subquery, QR.QueryBuffer):
                         if this_subquery.execution == IF.BO.Read:
@@ -203,7 +199,10 @@ class MoraxChip:
                                     )
                                     else SUBMIT_T
                                 )
+                    LAYER_SUBMIT_TIME = max(LAYER_SUBMIT_TIME, SUBMIT_T)
             # END SUBQUERY
+            # update layer submit time
+            _modelDAG.update_submit_t(thisrun_index, LAYER_SUBMIT_TIME)
             # 2 hook3
             for h_idx in _modelDAG.fromVertexDict[thisrun_index]:
                 _monitor.hook3_caf(
