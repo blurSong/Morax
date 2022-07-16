@@ -101,7 +101,7 @@ class ModelList(UserList):
         self.layernum = 0
 
     def add_layer(self, _layerclass):
-        super().append(_layerclass)
+        super().append(copy.deepcopy(_layerclass))
         self.layernum += 1
 
     def add_vlayer(self):

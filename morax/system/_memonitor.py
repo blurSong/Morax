@@ -52,7 +52,7 @@ class BulkNote:
     def __init__(self, _databulk: DataBulk) -> None:
         self.bulklabel = _databulk.bulklabel
         self.sizebyte = _databulk.bulksizebyte
-        self.scratchdict = _databulk.bulkscratch
+        self.scratchdict = copy.deepcopy(_databulk.bulkscratch)
 
 
 class Scratchpad:
@@ -80,8 +80,8 @@ class Scratchpad:
             # pad["token"] = _bulk.token
             self.Scratchpad[note] = copy.deepcopy(pad)
 
-    def before_or_after(tup1, tup2):
-        if 
+    # def before_or_after(tup1, tup2):
+    #    return
 
     def merge_scratchpad(self, _note, _fullsize):
         datatype = self.Scratchpad[_note]["datatype"]
@@ -354,7 +354,7 @@ class Memonitor:
             return 0, []
 
     def edit_note(self, _note, _newnote):
-        self.monitor[_newnote] = copy.deepcopy(_note)
+        self.monitor[_newnote] = copy.deepcopy(self.monitor[_note])
         del self.monitor[_note]
 
     """
@@ -437,5 +437,5 @@ class Memonitor:
                     _clusterlist[loc].WeightBuffer.release(_note)
                 elif worf == ClusterComponent.FeatureBuffer:
                     _clusterlist[loc].FeatureBuffer.release(_note)
-            self.eliminate_note(note)
+            self.eliminate_note(_note)
 

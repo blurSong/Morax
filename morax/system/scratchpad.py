@@ -46,7 +46,7 @@ class BulkNote:
     def __init__(self, _databulk) -> None:
         self.bulklabel = _databulk.bulklabel
         self.sizebyte = _databulk.bulksizebyte
-        self.scratchdict = _databulk.bulkscratch
+        self.scratchdict = copy.deepcopy(_databulk.bulkscratch)
 
 
 class Scratchpad:

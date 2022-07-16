@@ -273,11 +273,13 @@ class TensorCore:
                 sq_pearraylist[peid]["subtasksize"][0] > 0
                 and sq_pearraylist[peid]["subtasksize"][1] > 0
             ):
-                receive_t_list[peid] = self.PEArrayObjList[peid].run_subquery(
-                    sq_pearraylist[peid], invoke_t, query_tc.layerclass
+                receive_t_list.append(
+                    self.PEArrayObjList[peid].run_subquery(
+                        sq_pearraylist[peid], invoke_t, query_tc.layerclass
+                    )
                 )
             else:
-                receive_t_list[peid] = invoke_t
+                receive_t_list.append(invoke_t)
         submit_t = max(receive_t_list)
         return submit_t
 

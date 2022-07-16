@@ -72,7 +72,7 @@ class VritualQuerySeparator(VritualQuery):
 class QueryBuffer:
     def __init__(self, _databulkclass: DataBulk, _execution, _locationEnum, _toEnum):
         self.execution = _execution
-        self.databulkclass = _databulkclass
+        self.databulkclass = copy.deepcopy(_databulkclass)
         self.locationEnum = _locationEnum
         self.toEnum = _toEnum
         self.clusterid = -1
@@ -109,7 +109,7 @@ class QueryExcuteOnTC(QueryExcute):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksizelist = _tasksizelist
+        self.tasksizelist = copy.deepcopy(_tasksizelist)
         self.bulksize = _bulksize
         assert self.checkquery() is True
 
@@ -139,7 +139,7 @@ class QueryExcuteOnNVTC(QueryExcute):
         self.execution = _execution
         self.nvtcid = _nvtcid
         self.clusterid = _clusterid
-        self.sliceidlist = _sliceidlist
+        self.sliceidlist = copy.deepcopy(_sliceidlist)
         assert self.checkquery() is True
 
     def checkquery(self):
@@ -163,8 +163,8 @@ class QueryExcuteOnVPU(QueryExcute):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize  # (rowparts, collines)
-        assert self.checkquery() is True
+        self.tasksize = copy.deepcopy(_tasksize)  # (rowparts, collines)
+        # assert self.checkquery() is True
 
     def checkquery(self):
         dfsafe = True if self.dfmod in ["Linear", "SoftMAX", "PostProcess"] else False
@@ -185,7 +185,7 @@ class QueryExcuteOnSMU(QueryExcute):
         super().__init__(_layerclass, _tasklabel)
         self.dfmod = _dfmod
         self.execution = _execution
-        self.tasksize = _tasksize
+        self.tasksize = copy.deepcopy(_tasksize)
         assert self.checkquery() is True
 
     def checkquery(self):
@@ -204,7 +204,7 @@ class QueryRingBus:
         _toCluster,
         _worf,
     ):
-        self.databulkclass = _databulkclass
+        self.databulkclass = copy.deepcopy(_databulkclass)
         self.subbulksizebyte = _subbulksize
         self.fromCluster = _fromCluster
         self.toCluster = _toCluster
@@ -236,7 +236,7 @@ class LayerQuery:
     ) -> None:
         self.q_index = _q_index
         self.batch = _batch
-        self.assignment = _assignment
+        self.assignment = copy.deepcopy(_assignment)
         self.layerclass = copy.deepcopy(_layerclass)
         self.iodegree = {"in": _indegree, "out": _outdegree}
         self.subquerynum = 0
@@ -1061,9 +1061,13 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     tcbulksize = (
                         MoraxConfig.PEArraySize * MoraxConfig.PrecisionBits // 8
                     )
+                    tskbulksize = 0
+                    for s in range(MoraxConfig.PEArrayNum):
+                        tskbulksize += tasksize_list[s][0] * tasksize_list[s][1]
                     if b == 0:
-                        tcbulksize += (
-                            sum(tasksize_list)
+                        tcbulksize = (
+                            tcbulksize
+                            + tskbulksize
                             * MoraxConfig.PEArraySize
                             * MoraxConfig.PrecisionBits
                             // 8
@@ -1082,9 +1086,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
         for b in range(B):
             vbulk = DataBulk(_modelname, _index, "VEC", 0, {"B": b, "M": 0},)
             SubQueryList.append(
-                QueryBuffer(
-                    copy.deepcopy(QueryBuffer(vbulk, BO.Read, CC.FeatureBuffer, CC.VPU))
-                )
+                copy.deepcopy(QueryBuffer(vbulk, BO.Read, CC.FeatureBuffer, CC.VPU))
             )
             vtasklabel = make_tasklabel(_modelname, _index, b, "PostProcess")
             qv = QueryExcuteOnVPU(
@@ -1986,7 +1988,7 @@ def compileCMOS(_index, _modelname, _layerclass, _batch, token):
                     _modelname,
                     _index,
                     datatype,
-                    fosize * MoraxConfig.PrecisionBits // 8,
+                    fsize * MoraxConfig.PrecisionBits // 8,
                     iobulkscratch,
                     token,
                 )
@@ -2555,10 +2557,10 @@ def make_tc_task_list(_tasklen):
     for peid in range(MoraxConfig.PEArrayNum):
         if _tasklen >= MoraxConfig.PEArraySize:
             _tasklen -= MoraxConfig.PEArraySize
-            ttltup[peid] = (MoraxConfig.PEArraySize, MoraxConfig.PEArraySize)
+            ttltup.append((MoraxConfig.PEArraySize, MoraxConfig.PEArraySize))
         elif _tasklen > 0:
             _tasklen -= MoraxConfig.PEArraySize
-            ttltup[peid] = (MoraxConfig.PEArraySize, _tasklen)
+            ttltup.append((MoraxConfig.PEArraySize, _tasklen))
         else:
-            ttltup[peid] = (0, 0)
+            ttltup.append((0, 0))
     return ttltup

@@ -5,6 +5,8 @@
 from enum import Enum
 import numpy as np
 import pandas as pd
+import copy
+
 
 morax_layer_csv_dicts_cnn = {
     "IC": 0,
@@ -109,7 +111,7 @@ class LinearLayer(Layer):
     ) -> None:
         Layer.__init__(self, _layername, _layerindex)
         self.layer_type = _layertype
-        self.layer_csvline = _layercsvline
+        self.layer_csvline = copy.deepcopy(_layercsvline)
         self.memsizebyte = -1
 
 

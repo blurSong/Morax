@@ -265,15 +265,15 @@ def spcify_querybulk(_query_list: list):
     A nvtc bulk is R (R), EEEEEEE, V W
     0520: Use VritualQuerySeparator to spcify bulk
     """
-    assert isinstance(_query_list[0], QR.QueryBuffer)
-    assert _query_list[0].execution == IF.BO.Read
+    if not isinstance(_query_list[0], QR.QueryBuffer) or not (_query_list[0].execution == IF.BO.Read):
+        print("fatal, spciqury")
     this_querybulk = []
     while True:
-        this_querybulk.append(copy.deepcopy(_query_list.pop(index=0)))
+        this_querybulk.append(copy.deepcopy(_query_list.pop(0)))
         if len(_query_list) == 0:
             break
         elif isinstance(_query_list[0], QR.VritualQuerySeparator):
-            _query_list.pop(index=0)
+            _query_list.pop(0)
             break
 
     """

@@ -87,7 +87,7 @@ def calc_xbars(
 
 def calc_memsize_byte(_layerclass: LYR.LinearLayer, _bytes_per_word: int):
     layertype = _layerclass.layer_type
-    if layertype == LYR.LinearLayerType.Linear or LYR.LinearLayerType.VMM:
+    if layertype in [LYR.LinearLayerType.Linear, LYR.LinearLayerType.VMM]:
         params = _layerclass.row_dim * _layerclass.col_dim
     elif (
         layertype == LYR.LinearLayerType.CONV or layertype == LYR.LinearLayerType.TRCONV
@@ -146,7 +146,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                 if subq.execution == IF.BO.Read:
                     if subq.locationEnum == IF.ClusterComponent.FeatureBuffer:
                         runtime = (
-                            subq.databulkclass.sizebyte
+                            subq.databulkclass.bulksizebyte
                             * 8
                             // MoraxConfig.BufferReadBandwidthGbps
                         )
@@ -154,7 +154,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                         sqb_t = max(fb_tstamp[clst_idx], sqb_t)
                     elif subq.locationEnum == IF.ClusterComponent.WeightBuffer:
                         runtime = (
-                            subq.databulkclass.sizebyte
+                            subq.databulkclass.bulksizebyte
                             * 8
                             // MoraxConfig.BufferReadBandwidthGbps
                         )
@@ -162,7 +162,7 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
                         sqb_t = max(wb_tstamp[clst_idx], sqb_t)
                 elif subq.execution == IF.BO.Write:
                     runtime = (
-                        subq.databulkclass.sizebyte
+                        subq.databulkclass.bulksizebyte
                         * 8
                         // MoraxConfig.BufferWriteBandwidthGbps
                     )
@@ -194,13 +194,13 @@ def calc_compute_time(_layerquery: QR.LayerQuery):
             clst_idx = clst_idx + 1
             if clst_idx >= MoraxConfig.ClusterNum:
                 clst_idx = 0
-        return max(
-            np.amax(wb_tstamp),
-            np.amax(fb_tstamp),
-            np.amax(rb_tstamp),
-            np.amax(vpu_tstamp),
-            np.amax(tc_tstamp),
-        )
+    return max(
+        np.amax(wb_tstamp),
+        np.amax(fb_tstamp),
+        np.amax(rb_tstamp),
+        np.amax(vpu_tstamp),
+        np.amax(tc_tstamp),
+    )
 
 
 def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _batch):
@@ -339,8 +339,8 @@ def offline_sch_layerwaver(schduleDAG: SchduleDAG):
 
 
 def offline_map_naive(
-    schduleDAG: SchduleDAG,
-    CschduleIndexList,
+    _schduleDAG: SchduleDAG,
+    _CschduleIndexList,
     _xbar_num,
     _xbar_size,
     _bars_per_word,
@@ -350,12 +350,12 @@ def offline_map_naive(
     OnRRAMLayerIndexList = []
     GainDict = {}
     BarDict = {}
-    for sched_lyridx in CschduleIndexList:
-        lyrclass = schduleDAG.LayerClassDict[sched_lyridx]
+    for sched_lyridx in _CschduleIndexList:
+        lyrclass = _schduleDAG.LayerClassDict[sched_lyridx]
         bars, rol, col = calc_xbars(lyrclass, _xbar_size, _bars_per_word, True)
         ctime = (
-            schduleDAG.LayerOnCMOSDict_CT[sched_lyridx]
-            + schduleDAG.LayerOnCMOSDict_MT[sched_lyridx]
+            _schduleDAG.LayerOnCMOSDict_CT[sched_lyridx]
+            + _schduleDAG.LayerOnCMOSDict_MT[sched_lyridx]
         )
         rtime = calc_rram_time(lyrclass, rol, col, _xbar_size, _batch)
         gain = (ctime - rtime) * 1.0 / bars

@@ -77,7 +77,7 @@ class RRAMSlice:
         self.xbarnum = MoraxConfig.RRAMXbarNum
         self.xbarsize = MoraxConfig.RRAMXbarSize
         self.sliceid = _sliceid
-        self.layerids = _layerids
+        self.layerids = copy.deepcopy(_layerids)
         self.EightXbar = {
             "mvmrow": _mvmrow,
             "mvmcol": _mvmcol,
@@ -94,7 +94,7 @@ class RRAMSlice:
         self, _layerinfo: tuple, _mvmrow, _mvmcol, _lutrow,
     ):
         self.mapped = True
-        self.layerinfo = _layerinfo
+        self.layerinfo = copy.deepcopy(_layerinfo)
         self.EightXbar["mvmrow"] = _mvmrow
         self.EightXbar["mvmcol"] = _mvmcol
         self.EightXbar["lutrow"] = _lutrow
