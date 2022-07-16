@@ -35,6 +35,7 @@ class Mapper:
             CFG.MoraxConfig.PrecisionBits // CFG.MoraxConfig.RRAMCellBits
         )
         self.mapper_breakpoint = [0, 0, 0]  # clstid nvtcid sliceid
+        print("[Morax][System] Mapping updated.")
 
     def get_mapping_info(
         self, _modelname, layeridx, _row_l, _col_l, slice_idx, _COL_MAJOR=True
@@ -131,14 +132,17 @@ class Mapper:
                     )
                     sliceid = sliceid + 1
                 doclotnsl = self.make_doclotnsl(slice_num)
+                """ no need 
                 assert (
                     self.mapper_breakpoint[0] == clstid
                     and self.mapper_breakpoint[1] == nvtcid
                     and self.mapper_breakpoint[2] == sliceid
-                )
+                ), "mapper err."
+                """
                 _modelDAG.assign_layer(orli, True, doclotnsl)
             # assgin on cmos layer
             for lyridx in CschduleList:
                 if lyridx not in OnRRAMLayerIndexList:
                     _modelDAG.assign_layer(lyridx, False)
+        print("[Morax][System] Model mapped.")
         return CschduleList, OnRRAMLayerIndexList

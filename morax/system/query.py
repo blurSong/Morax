@@ -274,7 +274,7 @@ class LayerQuery:
 
     def compile(self, _modelname, _moraxchip, _concatlist=[]):
         # Generate subqueries of this layer query
-        print("[Morax][System] Compiling Query {}.".format(self.q_index))
+        # print("[Morax][System] Compiling Query {}.".format(self.q_index))
         layertype = self.layerclass.layer_type
         if isinstance(layertype, LLT):
             if layertype == LLT.CONCAT:
@@ -321,6 +321,7 @@ class LayerQuery:
 def generate_demmy_queries(
     _modelDAG: ModelDAG, _batch=1,
 ):
+    print("[Morax][System] Compile demmy queries.")
     chip = 0
     totalquery = 0
     for idx in _modelDAG.LayerIndexList:
@@ -341,6 +342,7 @@ def generate_demmy_queries(
 def generate_queries(
     _modelDAG: ModelDAG, _moraxchip, _batch=1,
 ):
+    print("[Morax][System] Compile queries.")
     totalquery = 0
     for idx in _modelDAG.LayerIndexList:
         q = LayerQuery(
@@ -351,6 +353,7 @@ def generate_queries(
             len(_modelDAG.fromVertexDict[idx]),
             len(_modelDAG.toVertexDict[idx]),
         )  # TODO: CHANGE INDEX TUPLE of Layerclass
+        print("[Morax][System] Compiling query {}".format(idx))
         q.compile(_modelDAG.modelname, _moraxchip, _modelDAG.ConcatList)
         _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
         totalquery += 1

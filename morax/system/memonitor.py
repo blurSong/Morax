@@ -16,6 +16,7 @@ class Memonitor:
     def __init__(self) -> None:
         self.scratchpadnum = MoraxConfig.ClusterNum
         self.monitor = {}
+        print("[Morax][System] Monitor initialized.")
 
     def add_loc(self, _note: str, _location: int):
         if _location not in self.monitor[_note]["loclist"]:

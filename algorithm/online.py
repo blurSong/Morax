@@ -3,15 +3,16 @@ import math
 import copy
 
 
-# demicode
 class Schduler:
     def __init__(self) -> None:
         self.OnRRAMLayerIndexList = []
         self.CschduleList = []
+        print("[Morax][Algo] Schduler initialized.")
 
     def update_sch(self, _CschduleList, _OnRRAMLayerIndexList):
         self.OnRRAMLayerIndexList = copy.deepcopy(_OnRRAMLayerIndexList)
         self.CschduleList = copy.deepcopy(_CschduleList)
+        print("[Morax][System] Schdule updated.")
 
     def schedule_one_layer(
         self, _candidatelayerlist: list, _modelDAG: ModelDAG,
