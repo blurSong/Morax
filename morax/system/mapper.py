@@ -35,7 +35,7 @@ class Mapper:
             CFG.MoraxConfig.PrecisionBits // CFG.MoraxConfig.RRAMCellBits
         )
         self.mapper_breakpoint = [0, 0, 0]  # clstid nvtcid sliceid
-        print("[Morax][System] Mapping updated.")
+        print("[Morax][System] Mapper initialized.")
 
     def get_mapping_info(
         self, _modelname, layeridx, _row_l, _col_l, slice_idx, _COL_MAJOR=True

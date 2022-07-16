@@ -42,7 +42,7 @@ class MoraxChip:
     ):
         # RRAM:
         # CMOS:
-        CandidateLayerList = [-1]
+        CandidateLayerList = copy.deepcopy(_modelDAG.toVertexDict[-1])
         while True:
             # 0.1 choose one layer, report layer index and issue_time
             # TODO OL.schedule_one_layer

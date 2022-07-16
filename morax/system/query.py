@@ -321,7 +321,7 @@ class LayerQuery:
 def generate_demmy_queries(
     _modelDAG: ModelDAG, _batch=1,
 ):
-    print("[Morax][System] Compile demmy queries.")
+    print("[Morax][Algo] Compile demmy queries.")
     chip = 0
     totalquery = 0
     for idx in _modelDAG.LayerIndexList:
@@ -358,7 +358,8 @@ def generate_queries(
         _modelDAG.LayerQueryClassDict[idx] = copy.deepcopy(q)
         totalquery += 1
     assert totalquery == _modelDAG.layernum
-
+    print("[Morax][System] Frontend done.")
+    return
     # NOTE DAG begins with virtual layer -1
     # Branch conds:
     # 1 Residual -> this cluster
