@@ -23,6 +23,7 @@ from morax.hardware import chip
 from morax.system import memonitor, query, mapper
 
 import algorithm.online as OL
+import algorithm.offline as OFL
 
 
 def set_path():
@@ -49,11 +50,11 @@ def set_parser():
     parser.add_argument(
         "--scenario", type=str, default="sm", choices=["sm", "mm", "cs"]
     )  # single model multi-model context-switching
-    parser.add_argument("--strategy", type=int, default="2", choices=[0, 1, 2, 3, 4])
+    # parser.add_argument("--strategy", type=int, default="2", choices=[0, 1, 2, 3, 4])
     parser.add_argument(
         "--model",
         type=str,
-        default="resnet18",
+        default="vgg16",
         choices=[
             "alexnet",
             "vgg16",
@@ -138,12 +139,14 @@ if __name__ == "__main__":
     Mapper = mapper.Mapper(LUTEN_)
     Schduler = OL.Schduler()
 
+    strategy = OFL.Strategy.greedy
     # run
     if args.scenario == "sm":
         # offline process
-        Schduler.update_sch(
-            Mapper.map_single(ModelDAG, MoraxChip, args.strategy, args.batch)
+        CschduleList, OnRRAMLayerIndexList = Mapper.map_single(
+            ModelDAG, MoraxChip, strategy, args.batch
         )
+        Schduler.update_sch(CschduleList, OnRRAMLayerIndexList)
         query.generate_queries(ModelDAG, MoraxChip, args.batch)
         # online process
         MoraxChip.invoke_morax(ModelDAG, MemMonitor, Schduler)

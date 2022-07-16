@@ -113,58 +113,60 @@ class VPU:
         self.VPUActionList.append(vad)
         return self.TimeFilm[-1].submit_t
 
-
-def run_demmy_query(self, _q_vpu: QueryExcuteOnVPU):
-    q_vpu = copy.deepcopy(_q_vpu)
-    runtime = 0
-    if q_vpu.dfmod == "PostProcess":  # postprocess of NVTC or TC
-        (rowparts, collines) = q_vpu.tasksize
-        runtime = rowparts * math.ceil(float(collines) / (self.lanesize * self.lanenum))
-    elif q_vpu.dfmod == "SoftMAX":
-        # NLT.Softmax1D 2D
-        # max trick + [max-8） drop + exp LUT  + div LUT
-        vdim = (
-            q_vpu.layerclass.v_dim
-            if q_vpu.layerclass.layertype == NLT.Softmax1D
-            else q_vpu.layerclass.col_dim
-        )
-        # SO.VMAX
-        if q_vpu.execution == VPUExe[7]:
-            runtime = math.ceil((float(vdim) / self.lanesize) / self.lanenum) * (
-                self.lanesize ** 0.5
+    def run_demmy_query(self, _q_vpu: QueryExcuteOnVPU):
+        q_vpu = copy.deepcopy(_q_vpu)
+        runtime = 0
+        if q_vpu.dfmod == "PostProcess":  # postprocess of NVTC or TC
+            (rowparts, collines) = q_vpu.tasksize
+            runtime = rowparts * math.ceil(
+                float(collines) / (self.lanesize * self.lanenum)
             )
-        # SO.VNORM
-        elif q_vpu.execution == VPUExe[8]:
-            runtime = (
-                math.ceil((float(vdim) / self.lanesize) / self.lanenum) + vdim ** 0.5
+        elif q_vpu.dfmod == "SoftMAX":
+            # NLT.Softmax1D 2D
+            # max trick + [max-8） drop + exp LUT  + div LUT
+            vdim = (
+                q_vpu.layerclass.v_dim
+                if q_vpu.layerclass.layertype == NLT.Softmax1D
+                else q_vpu.layerclass.col_dim
             )
-    else:
-        # LLT.VDP: one op
-        # LLT.VMM == LLT.Linear: one output
-        if q_vpu.execution == VPUExe[0] or q_vpu.execution == VPUExe[3]:
-            vvtimes = math.ceil(
-                (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
-            )
-            runtime = vvtimes * (self.lanesize ** 0.5) + vvtimes
-        # LLT.VADD
-        elif q_vpu.execution == VPUExe[1]:
-            runtime = math.ceil(
-                (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
-            )
-        # LLT.VMUL
-        elif q_vpu.execution == VPUExe[2]:
-            runtime = math.ceil(
-                (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
-            )
-        elif q_vpu.execution == VPUExe[4] or q_vpu.execution == VPUExe[5]:
-            R = math.ceil(float(q_vpu.layerclass.row_dim) / self.lanenum)
-            C = math.ceil(float(q_vpu.layerclass.col_dim) / self.lanesize)
-            runtime = R * C * 2
-        # NLT.Pooling one channel
-        elif q_vpu.execution == VPUExe[6]:
-            osize = q_vpu.layerclass.feature_size / q_vpu.layerclass.kernel_size
-            runtime = (math.ceil(float(osize) / self.lanesize) / self.lanenum) ** 2
-    return runtime
+            # SO.VMAX
+            if q_vpu.execution == VPUExe[7]:
+                runtime = math.ceil((float(vdim) / self.lanesize) / self.lanenum) * (
+                    self.lanesize ** 0.5
+                )
+            # SO.VNORM
+            elif q_vpu.execution == VPUExe[8]:
+                runtime = (
+                    math.ceil((float(vdim) / self.lanesize) / self.lanenum)
+                    + vdim ** 0.5
+                )
+        else:
+            # LLT.VDP: one op
+            # LLT.VMM == LLT.Linear: one output
+            if q_vpu.execution == VPUExe[0] or q_vpu.execution == VPUExe[3]:
+                vvtimes = math.ceil(
+                    (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
+                )
+                runtime = vvtimes * (self.lanesize ** 0.5) + vvtimes
+            # LLT.VADD
+            elif q_vpu.execution == VPUExe[1]:
+                runtime = math.ceil(
+                    (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
+                )
+            # LLT.VMUL
+            elif q_vpu.execution == VPUExe[2]:
+                runtime = math.ceil(
+                    (float(q_vpu.layerclass.v_dim) / self.lanesize) / self.lanenum
+                )
+            elif q_vpu.execution == VPUExe[4] or q_vpu.execution == VPUExe[5]:
+                R = math.ceil(float(q_vpu.layerclass.row_dim) / self.lanenum)
+                C = math.ceil(float(q_vpu.layerclass.col_dim) / self.lanesize)
+                runtime = R * C * 2
+            # NLT.Pooling one channel
+            elif q_vpu.execution == VPUExe[6]:
+                osize = q_vpu.layerclass.feature_size / q_vpu.layerclass.kernel_size
+                runtime = (math.ceil(float(osize) / self.lanesize) / self.lanenum) ** 2
+        return runtime
 
 
 def get_reducetime(_dim: int):

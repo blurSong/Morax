@@ -1,10 +1,10 @@
 from calendar import c
+import imp
 import math
 from random import gauss
 from tkinter.tix import Select
 from xml.dom.minidom import Element
 from anyio import current_time
-import iniconfig
 from enum import Enum
 import copy
 import numpy as np
@@ -52,7 +52,7 @@ def calc_xbars(
     layertype = _layerclass.layer_type
     row_l, col_l = 0, 0
     dup = _bars_per_word
-    if layertype == LYR.LinearLayerType.Linear or LYR.LinearLayerType.VMM:
+    if layertype in [LYR.LinearLayerType.Linear, LYR.LinearLayerType.VMM]:
         row_l = _layerclass.row_dim
         col_l = _layerclass.col_dim
     elif (
@@ -239,6 +239,7 @@ def calc_rram_time(_layerclass: LYR.LinearLayer, _row_l, _col_l, _xbar_size, _ba
             )
         )
         O2 = 1
+        R = math.ceil(_row_l * 1.0 / _xbar_size[0])
         rbulksizebits = _row_l * MoraxConfig.PrecisionBits
 
     # for bat in range(B):
@@ -286,6 +287,7 @@ def schedule_layers(
             schduleDAG.LayerQueryClassDict[lyridx]
         )
     # choose strategy and get cmos sch
+    CschduleList = []
     if _strategy == Strategy.greedy:
         CschduleList = offline_sch_greedy(schduleDAG)
     elif _strategy == Strategy.layerwaver:
@@ -297,25 +299,25 @@ def schedule_layers(
     return CschduleList, OnRRAMLayerIndexList
 
 
-def offline_sch_greedy(schduleDAG: SchduleDAG):
-    SchduleList = [-1]
-    CandidateLayerList = copy.deepcopy(schduleDAG.toVertexDict[-1])
+def offline_sch_greedy(_schduleDAG: SchduleDAG):
+    SchduleList = []
+    CandidateLayerList = copy.deepcopy(_schduleDAG.toVertexDict[-1])
     while CandidateLayerList:
-        mt = schduleDAG.LayerOnCMOSDict_MT[CandidateLayerList[0]]
+        mt = _schduleDAG.LayerOnCMOSDict_MT[CandidateLayerList[0]]
         thislyr_idx = CandidateLayerList[0]
         for cdidx in CandidateLayerList:
-            if schduleDAG.LayerOnCMOSDict_MT[cdidx] < mt:
-                mt = schduleDAG.LayerOnCMOSDict_MT[cdidx]
+            if _schduleDAG.LayerOnCMOSDict_MT[cdidx] < mt:
+                mt = _schduleDAG.LayerOnCMOSDict_MT[cdidx]
                 thislyr_idx = cdidx
         SchduleList.append(thislyr_idx)
         CandidateLayerList.remove(thislyr_idx)
-        schduleDAG.LayerQueryClassDict[thislyr_idx].FINISHED_FLAG = True
-        for candiidx in schduleDAG.toVertexDict[thislyr_idx]:
+        _schduleDAG.LayerQueryClassDict[thislyr_idx].FINISHED_FLAG = True
+        for candiidx in _schduleDAG.toVertexDict[thislyr_idx]:
             iscandidate = True
-            for tmpfromidx in schduleDAG.fromVertexDict[candiidx]:
+            for tmpfromidx in _schduleDAG.fromVertexDict[candiidx]:
                 if (
                     tmpfromidx != thislyr_idx
-                    and not schduleDAG.LayerQueryClassDict[tmpfromidx].FINISHED_FLAG
+                    and not _schduleDAG.LayerQueryClassDict[tmpfromidx].FINISHED_FLAG
                 ):
                     iscandidate = False
                     break
@@ -352,6 +354,8 @@ def offline_map_naive(
     BarDict = {}
     for sched_lyridx in _CschduleIndexList:
         lyrclass = _schduleDAG.LayerClassDict[sched_lyridx]
+        if lyrclass.layer_type not in LYR.OnRRAMLayerTypeList:
+            continue
         bars, rol, col = calc_xbars(lyrclass, _xbar_size, _bars_per_word, True)
         ctime = (
             _schduleDAG.LayerOnCMOSDict_CT[sched_lyridx]

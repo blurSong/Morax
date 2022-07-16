@@ -71,6 +71,8 @@ class Mapper:
                 else CFG.MoraxConfig.RRAMSliceNum
             )
             snum = end - begin
+            if self.mapper_breakpoint[0] not in doclotnsl:
+                doclotnsl[self.mapper_breakpoint[0]] = []
             doclotnsl[self.mapper_breakpoint[0]].append(
                 (self.mapper_breakpoint[1], tuple(copy.deepcopy(SLICELIST[begin:end])),)
             )

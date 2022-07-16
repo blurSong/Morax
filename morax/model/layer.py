@@ -88,6 +88,16 @@ class NonlinearLayerType(Enum):
     Softmax2D = -3
 
 
+OnRRAMLayerTypeList = [
+    LinearLayerType.Linear,
+    LinearLayerType.CONV,
+    LinearLayerType.TRCONV,
+    LinearLayerType.NGCONV,
+    LinearLayerType.GEMM,
+    LinearLayerType.VMM,
+]
+
+
 class Layer:
     def __init__(self, _layername: str, _layerindex) -> None:
         self.layer_name = _layername
