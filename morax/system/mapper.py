@@ -137,4 +137,8 @@ class Mapper:
                     and self.mapper_breakpoint[2] == sliceid
                 )
                 _modelDAG.assign_layer(orli, True, doclotnsl)
+            # assgin on cmos layer
+            for lyridx in CschduleList:
+                if lyridx not in OnRRAMLayerIndexList:
+                    _modelDAG.assign_layer(lyridx, False)
         return CschduleList, OnRRAMLayerIndexList

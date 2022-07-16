@@ -375,6 +375,7 @@ def offline_map_naive(
             total_bars = total_bars - bars
         else:
             continue
+    OnRRAMLayerIndexList.sort()
     return OnRRAMLayerIndexList
 
 
