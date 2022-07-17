@@ -147,19 +147,15 @@ class RRAMSlicesTree:
             self.hops = MoraxConfig.RRAMSliceNum ** 0.5 - 1
         self.TreeCastList = []
 
-    def downstream(
-        self, _issue_t: int, _q_tree=None,
-    ):
+    def downstream(self):
         # _q_tree: tasksizelist: list of tuple(treenode_id, leaf_id) subtasklabel: str
         # _bulksize is the total databulk to issue of this query
-        return _issue_t + self.hops
+        return self.hops
 
-    def uptream(
-        self, _issue_t: int, _q_tree=None,
-    ):
+    def uptream(self):
         # _q_tree: tasksizelist: list of tuple(treenode_id, leaf_id) subtasklabel: str
         # _bulksize is the total databulk to issue of this query
-        return _issue_t + self.hops
+        return self.hops
 
 
 class nvTensorCore:

@@ -106,7 +106,7 @@ class ScratchpadBuffer:
         self.BufferIOList = []
 
     def write_buffer(self, _databulk: DataBulk):
-        if self.WaterLineByte + _databulk.sizebyte > self.CapacityByte:
+        if self.WaterLineByte + _databulk.bulksizebyte > self.CapacityByte:
             # TODO
             # raise Exception("Buffer overflowed.")
             print(("Buffer overflowed."))
@@ -117,7 +117,7 @@ class ScratchpadBuffer:
         else:
             # self.LabelSet.add(_databulk.label)
             self.Scratchpad.writeANote(_databulk)
-            self.WaterLineByte += _databulk.sizebyte
+            self.WaterLineByte += _databulk.bulksizebyte
 
     def read_buffer(self, _databulk: DataBulk) -> str:
         return self.Scratchpad.readANote(_databulk)
@@ -143,15 +143,15 @@ class ScratchpadBuffer:
         if _q_buffer.databulkclass.bulksizebyte > 0:
             if execution == BO.Write:
                 self.write_buffer(_q_buffer.databulkclass)
-                bioatd.Write = _q_buffer.databulkclass.sizebyte
+                bioatd.Write = _q_buffer.databulkclass.bulksizebyte
             else:
                 read_result = self.read_buffer(_q_buffer.databulkclass)
                 if read_result == "Success":
-                    bioatd.Read = _q_buffer.databulkclass.sizebyte
+                    bioatd.Read = _q_buffer.databulkclass.bulksizebyte
                 else:
                     return -1
                     # need inter cluster read or dram read
-        runtime = _q_buffer.databulkclass.sizebyte * 8 // bw if bw != 0 else 0
+        runtime = _q_buffer.databulkclass.bulksizebyte * 8 // bw if bw != 0 else 0
         biots.update_span(runtime)
         self.TimeFilm.append_stamp_bufferver(biots)
         self.BufferIOList.append(bioatd)

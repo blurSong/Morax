@@ -84,8 +84,10 @@ class DMA:
 
     def run_query(self, _q_dma: QueryDMA, _issue_t, _clusterlist) -> int:
         dmaad = DRAMReadActionDict(_q_dma.databulkclass, _q_dma.toCluster)
-        dmats = TimeStamp(TO.ReadDRAM, _issue_t, _q_dma.databulkclass.label)
-        runtime = _q_dma.databulkclass.sizebyte * 8 // MoraxConfig.OffChipBandwidthGbps
+        dmats = TimeStamp(TO.ReadDRAM, _issue_t, _q_dma.databulkclass.bulklabel)
+        runtime = (
+            _q_dma.databulkclass.bulksizebyte * 8 // MoraxConfig.OffChipBandwidthGbps
+        )
         # if _q_dma.worf == ClusterComponent.FeatureBuffer:
         # NOTE DO NOTHING!
         # _clusterlist[_q_dma.toCluster].FeatureBuffer.write_buffer(

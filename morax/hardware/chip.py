@@ -4,7 +4,6 @@
 # Last modification: 0327
 
 from ast import Break
-from http.client import CONTINUE
 from stat import S_ISFIFO
 from urllib.request import install_opener
 import numpy as np
@@ -42,6 +41,7 @@ class MoraxChip:
     ):
         # RRAM:
         # CMOS:
+        _modelDAG.update_submit_t(-1, 0)
         CandidateLayerList = copy.deepcopy(_modelDAG.toVertexDict[-1])
         while True:
             # 0.1 choose one layer, report layer index and issue_time
@@ -78,6 +78,7 @@ class MoraxChip:
                 ThisLayerQuery.batch,
                 thisrun_index,
                 ThisLayerQuery.layerclass,
+                _modelDAG.modelname,
                 onRRAM,
             )
 
@@ -120,6 +121,7 @@ class MoraxChip:
                                 this_subquery.clusterid,
                                 thisrun_index,
                                 ThisLayerQuery.layerclass,
+                                _modelDAG.modelname,
                             )
                     # 1.2 run extra_queries
                     EXTRA_T = LAYER_ISSUE_TIME
@@ -208,6 +210,7 @@ class MoraxChip:
                 _monitor.hook3_caf(
                     h_idx,
                     _modelDAG.LayerQueryClassDict[thisrun_index],
+                    _modelDAG.modelname,
                     self.ClusterList,
                 )
             # 3 check end

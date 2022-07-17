@@ -48,16 +48,16 @@ class Memonitor:
     # ================================================================================
     # hooks 0517
 
-    def hook0_init(self, _token, _batch, _index, _layerclass, onRRAM=False):
+    def hook0_init(
+        self, _token, _batch, _index, _layerclass, _modelname, _onRRAM=False
+    ):
         """ 
         make layer output note, and make offchip note if needed. 
         invoke when run a new layer.
         """
 
         # make output note
-        outnote = (
-            _layerclass.modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
-        )
+        outnote = _modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
         self.monitor[outnote] = {}
         self.monitor[outnote]["token"] = _token
         self.monitor[outnote]["worf"] = ClusterComponent.FeatureBuffer
@@ -68,7 +68,7 @@ class Memonitor:
 
         # make weight and offchip data not
         (IIleft, IIright) = _layerclass.input_indecies_tuple
-        if (IIleft == 0 or IIright == 0) and not onRRAM:
+        if (IIleft == 0 or IIright == 0) and not _onRRAM:
             panote = (
                 _layerclass.modelname
                 + "_"
@@ -138,26 +138,16 @@ class Memonitor:
         return ExtraQueryList
 
     # hook2, check before write
-    def hook2_cbw(
-        self, _clusterid: int, _index, _layerclass,
-    ):
-        outnote = (
-            _layerclass.modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
-        )
+    def hook2_cbw(self, _clusterid: int, _index, _layerclass, _modelname):
+        outnote = _modelname + "_" + str(_index) + "_" + get_datatype(_layerclass)
         self.add_loc(outnote, _clusterid)
         return
 
     # hook3, check input after one layer finish
     def hook3_caf(
-        self, pre_index, _pre_layerclass, _clusterlist: list,
+        self, pre_index, _pre_layerclass, _modelname, _clusterlist: list,
     ):
-        note = (
-            _pre_layerclass.modelname
-            + "_"
-            + str(pre_index)
-            + "_"
-            + get_datatype(_pre_layerclass)
-        )
+        note = _modelname + "_" + str(pre_index) + "_" + get_datatype(_pre_layerclass)
         self.monitor[note]["token"] -= 1
         if self.monitor[note]["token"] == 0:
             worf = self.monitor[note]["worf"]
