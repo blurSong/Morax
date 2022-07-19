@@ -207,9 +207,11 @@ class MoraxChip:
             _modelDAG.update_submit_t(thisrun_index, LAYER_SUBMIT_TIME)
             # 2 hook3
             for h_idx in _modelDAG.fromVertexDict[thisrun_index]:
+                if h_idx == -1:
+                    continue
                 _monitor.hook3_caf(
                     h_idx,
-                    _modelDAG.LayerQueryClassDict[thisrun_index],
+                    _modelDAG.LayerClassDict[thisrun_index],
                     _modelDAG.modelname,
                     self.ClusterList,
                 )

@@ -65,13 +65,13 @@ class Scratchpad:
                 self.Scratchpad[note]["bulknotelist"].append(copy.deepcopy(bulknote))
             # assert self.Scratchpad[note]["token"] == _bulk.token
             # NOTE token is maintained in monitor
-        else:
-            pad = {}
-            pad["sizebyte"] = _bulk.bulksizebyte
-            pad["datatype"] = _bulk.datatype
-            abulknote = bulknote(_bulk)
-            pad["bulknotelist"] = [abulknote]
-            self.Scratchpad[note] = copy.deepcopy(pad)
+            else:
+                pad = {}
+                pad["sizebyte"] = _bulk.bulksizebyte
+                pad["datatype"] = _bulk.datatype
+                abulknote = bulknote(_bulk)
+                pad["bulknotelist"] = [abulknote]
+                self.Scratchpad[note] = copy.deepcopy(pad)
 
     def merge_2scratch(_hw1, _hw2):
         htup1 = _hw1[0]

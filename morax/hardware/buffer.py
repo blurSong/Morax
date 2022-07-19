@@ -106,11 +106,13 @@ class ScratchpadBuffer:
         self.BufferIOList = []
 
     def write_buffer(self, _databulk: DataBulk):
+        """
         if self.WaterLineByte + _databulk.bulksizebyte > self.CapacityByte:
             # TODO
             # raise Exception("Buffer overflowed.")
             print(("Buffer overflowed."))
-        elif _databulk.label in self.Scratchpad:
+        """
+        if _databulk.bulklabel in self.Scratchpad.Scratchpad:
             # TODO
             # raise Exception("Buffer duplicated.")
             print(("Buffer duplicated."))
